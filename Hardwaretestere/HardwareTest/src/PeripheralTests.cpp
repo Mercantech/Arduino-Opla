@@ -57,7 +57,7 @@ bool testButtons(MKRIoTCarrier &carrier) {
         Serial.print(F("Knap "));
         Serial.print(i);
         Serial.println(F(" trykket"));
-        carrier.Buzzer.beep();
+        maybeBeep(carrier);
       }
     }
     allButtonsPressed = true;
@@ -119,6 +119,10 @@ bool testLEDs(MKRIoTCarrier &carrier) {
 }
 
 bool testBuzzer(MKRIoTCarrier &carrier) {
+#if !ENABLE_SOUND_TEST
+  Serial.println(F("Buzzer: sprunget over (ENABLE_SOUND_TEST=false)"));
+  return true;
+#else
   carrier.display.fillScreen(ST77XX_BLACK);
   carrier.display.setTextColor(ST77XX_WHITE);
   carrier.display.setTextSize(2);
@@ -145,4 +149,5 @@ bool testBuzzer(MKRIoTCarrier &carrier) {
 
   showTestResult(carrier, "Buzzer", true);
   return true;
+#endif
 }

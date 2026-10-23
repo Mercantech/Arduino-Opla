@@ -12,6 +12,12 @@ void runAllTests(MKRIoTCarrier &carrier) {
   int passed = 0;
   int failed = 0;
 
+#if ENABLE_SOUND_TEST
+  Serial.println(F("Lyd: TIL (buzzer + bip)"));
+#else
+  Serial.println(F("Lyd: FRA (stille lokale — buzzer sprunget over)"));
+#endif
+
   track(testOLEDScreen(carrier), passed, failed);
   track(testHumidityTemperature(carrier), passed, failed);
   track(testPressureSensor(carrier), passed, failed);
@@ -21,7 +27,11 @@ void runAllTests(MKRIoTCarrier &carrier) {
   track(testRelays(carrier), passed, failed);
   track(testButtons(carrier), passed, failed);
   track(testLEDs(carrier), passed, failed);
+#if ENABLE_SOUND_TEST
   track(testBuzzer(carrier), passed, failed);
+#else
+  Serial.println(F("Buzzer: SPRUNGET OVER"));
+#endif
 
   Serial.println(F("=== Test-opsummering ==="));
   Serial.print(F("Bestået: "));

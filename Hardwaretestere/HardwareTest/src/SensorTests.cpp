@@ -213,22 +213,22 @@ bool testRGBGestureSensor(MKRIoTCarrier &carrier) {
         case UP:
           carrier.display.println(F("OP"));
           gestureDetected[0] = true;
-          carrier.Buzzer.beep();
+          maybeBeep(carrier);
           break;
         case DOWN:
           carrier.display.println(F("NED"));
           gestureDetected[1] = true;
-          carrier.Buzzer.beep();
+          maybeBeep(carrier);
           break;
         case LEFT:
           carrier.display.println(F("VENSTRE"));
           gestureDetected[2] = true;
-          carrier.Buzzer.beep();
+          maybeBeep(carrier);
           break;
         case RIGHT:
           carrier.display.println(F("HOJRE"));
           gestureDetected[3] = true;
-          carrier.Buzzer.beep();
+          maybeBeep(carrier);
           break;
         default:
           carrier.display.println(F("-"));

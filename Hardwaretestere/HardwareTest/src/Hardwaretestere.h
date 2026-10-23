@@ -3,8 +3,16 @@
 
 #include <Arduino_MKRIoTCarrier.h>
 
+// Stille lokale: sæt til false — springer buzzer-test over og undgår bip ved knapper/gesture
+#ifndef ENABLE_SOUND_TEST
+#define ENABLE_SOUND_TEST true
+#endif
+
 // Enheds-ID'er
 void printDeviceIds(MKRIoTCarrier &carrier);
+
+// Bip kun hvis ENABLE_SOUND_TEST er true
+void maybeBeep(MKRIoTCarrier &carrier);
 
 // OLED
 void initOLEDScreen(MKRIoTCarrier &carrier);

@@ -65,6 +65,14 @@ void printDeviceIds(MKRIoTCarrier &carrier) {
   delay(4000);
 }
 
+void maybeBeep(MKRIoTCarrier &carrier) {
+#if ENABLE_SOUND_TEST
+  carrier.Buzzer.beep();
+#else
+  (void)carrier;
+#endif
+}
+
 void showTestResult(MKRIoTCarrier &carrier, const char *name, bool ok) {
   carrier.display.fillScreen(ST77XX_BLACK);
   carrier.display.setTextSize(2);
