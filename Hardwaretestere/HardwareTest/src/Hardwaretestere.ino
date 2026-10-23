@@ -12,7 +12,7 @@ void setup() {
 
   Serial.println(F("Arduino Opla Hardware Tester - Fuld Test"));
 
-  carrier.noCase(); // uden kabinet; brug withCase() hvis kabinet er monteret
+  carrier.withCase(); // kabinet på — højere touch-følsomhed til knapperne
 
   if (!carrier.begin()) {
     Serial.println(F("FEJL: carrier.begin() fejlede"));
