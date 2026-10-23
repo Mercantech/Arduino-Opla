@@ -35,7 +35,19 @@ void maybeBeep(MKRIoTCarrier &carrier);
 // Registrér/opdatér enhed + testrapport via HTTPS
 bool reportToApi(MKRIoTCarrier &carrier);
 
-// OLED
+// OLED — rund 240x240 (centreret tekst, sikker zone)
+#define OLED_W 240
+#define OLED_H 240
+#define OLED_CX 120
+#define OLED_CY 120
+#define OLED_SAFE_TOP 32
+#define OLED_SAFE_BOTTOM 208
+
+void clearDisplay(MKRIoTCarrier &carrier);
+void drawCentered(MKRIoTCarrier &carrier, const char *text, int16_t y, uint8_t size, uint16_t color);
+void drawCenteredF(MKRIoTCarrier &carrier, const __FlashStringHelper *text, int16_t y, uint8_t size, uint16_t color);
+void drawCenteredBlock(MKRIoTCarrier &carrier, const char *const *lines, int count, uint8_t size, uint16_t color);
+
 void initOLEDScreen(MKRIoTCarrier &carrier);
 bool testOLEDScreen(MKRIoTCarrier &carrier);
 void testFarver(MKRIoTCarrier &carrier);

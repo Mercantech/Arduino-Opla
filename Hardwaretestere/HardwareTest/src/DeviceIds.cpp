@@ -44,29 +44,21 @@ void printDeviceIds(MKRIoTCarrier &carrier) {
   Serial.println(g_eccOk ? g_eccSerial : "(ikke fundet)");
   Serial.println(F("===================="));
 
-  carrier.display.fillScreen(ST77XX_BLACK);
-  carrier.display.setTextColor(ST77XX_CYAN);
-  carrier.display.setTextSize(2);
-  carrier.display.setCursor(20, 10);
-  carrier.display.println(F("Enheds-ID"));
-
-  carrier.display.setTextColor(ST77XX_WHITE);
-  carrier.display.setTextSize(1);
-  carrier.display.setCursor(10, 50);
-  carrier.display.println(F("SAMD:"));
-  carrier.display.setCursor(10, 65);
-  carrier.display.println(g_samdId);
-
-  carrier.display.setCursor(10, 95);
-  carrier.display.println(F("WiFi MAC:"));
-  carrier.display.setCursor(10, 110);
-  carrier.display.println(g_macStr);
-
-  carrier.display.setCursor(10, 140);
-  carrier.display.println(F("ECCX08:"));
-  carrier.display.setCursor(10, 155);
-  carrier.display.println(g_eccOk ? g_eccSerial : "(ikke fundet)");
-
+  clearDisplay(carrier);
+  drawCenteredF(carrier, F("Enheds-ID"), 40, 2, ST77XX_CYAN);
+  drawCenteredF(carrier, F("SAMD"), 75, 1, ST77XX_WHITE);
+  // Lang ID: to linjer á 16 tegn, centreret
+  char samdA[20], samdB[20];
+  strncpy(samdA, g_samdId, 16);
+  samdA[16] = '\0';
+  strncpy(samdB, g_samdId + 16, 16);
+  samdB[16] = '\0';
+  drawCentered(carrier, samdA, 92, 1, ST77XX_YELLOW);
+  drawCentered(carrier, samdB, 106, 1, ST77XX_YELLOW);
+  drawCenteredF(carrier, F("MAC"), 128, 1, ST77XX_WHITE);
+  drawCentered(carrier, g_macStr, 144, 1, ST77XX_YELLOW);
+  drawCenteredF(carrier, F("ECCX08"), 166, 1, ST77XX_WHITE);
+  drawCentered(carrier, g_eccOk ? g_eccSerial : "-", 182, 1, ST77XX_YELLOW);
   delay(4000);
 }
 
@@ -79,13 +71,9 @@ void maybeBeep(MKRIoTCarrier &carrier) {
 }
 
 void showTestResult(MKRIoTCarrier &carrier, const char *name, bool ok) {
-  carrier.display.fillScreen(ST77XX_BLACK);
-  carrier.display.setTextSize(2);
-  carrier.display.setTextColor(ok ? ST77XX_GREEN : ST77XX_RED);
-  carrier.display.setCursor(15, 60);
-  carrier.display.println(name);
-  carrier.display.setCursor(15, 100);
-  carrier.display.println(ok ? F("OK!") : F("FEJL!"));
+  clearDisplay(carrier);
+  drawCentered(carrier, name, OLED_CY - 28, 2, ok ? ST77XX_GREEN : ST77XX_RED);
+  drawCentered(carrier, ok ? "OK!" : "FEJL!", OLED_CY + 8, 3, ok ? ST77XX_GREEN : ST77XX_RED);
   Serial.print(name);
   Serial.println(ok ? F(": OK") : F(": FEJL"));
   delay(1500);

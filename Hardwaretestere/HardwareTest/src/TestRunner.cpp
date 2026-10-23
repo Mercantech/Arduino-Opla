@@ -11,6 +11,7 @@ static void track(bool ok, int &passed, int &failed) {
 void runAllTests(MKRIoTCarrier &carrier) {
   int passed = 0;
   int failed = 0;
+  char line[24];
 
 #if ENABLE_SOUND_TEST
   Serial.println(F("Lyd: TIL (buzzer + bip)"));
@@ -42,16 +43,11 @@ void runAllTests(MKRIoTCarrier &carrier) {
   Serial.print(F("Fejlet:  "));
   Serial.println(failed);
 
-  carrier.display.fillScreen(ST77XX_BLACK);
-  carrier.display.setTextSize(2);
+  clearDisplay(carrier);
   if (failed == 0) {
-    carrier.display.setTextColor(ST77XX_GREEN);
-    carrier.display.setCursor(15, 60);
-    carrier.display.println(F("Alle tests"));
-    carrier.display.setCursor(15, 100);
-    carrier.display.println(F("fuldfort!"));
-    carrier.display.setCursor(15, 150);
-    carrier.display.println(F("Hardware OK!"));
+    drawCenteredF(carrier, F("Alle tests"), 70, 2, ST77XX_GREEN);
+    drawCenteredF(carrier, F("fuldfort"), 105, 2, ST77XX_GREEN);
+    drawCenteredF(carrier, F("Hardware OK"), 150, 2, ST77XX_WHITE);
     for (int i = 0; i < 5; i++) {
       carrier.leds.fill(carrier.leds.Color(0, 255, 0), 0, 5);
       carrier.leds.show();
@@ -61,16 +57,11 @@ void runAllTests(MKRIoTCarrier &carrier) {
       delay(250);
     }
   } else {
-    carrier.display.setTextColor(ST77XX_RED);
-    carrier.display.setCursor(15, 50);
-    carrier.display.println(F("Tests FEJL"));
-    carrier.display.setTextColor(ST77XX_WHITE);
-    carrier.display.setCursor(15, 100);
-    carrier.display.print(F("OK: "));
-    carrier.display.println(passed);
-    carrier.display.setCursor(15, 130);
-    carrier.display.print(F("Fejl: "));
-    carrier.display.println(failed);
+    drawCenteredF(carrier, F("Tests FEJL"), 65, 2, ST77XX_RED);
+    snprintf(line, sizeof(line), "OK: %d", passed);
+    drawCentered(carrier, line, 115, 2, ST77XX_WHITE);
+    snprintf(line, sizeof(line), "Fejl: %d", failed);
+    drawCentered(carrier, line, 150, 2, ST77XX_WHITE);
     for (int i = 0; i < 5; i++) {
       carrier.leds.fill(carrier.leds.Color(255, 0, 0), 0, 5);
       carrier.leds.show();
@@ -81,6 +72,5 @@ void runAllTests(MKRIoTCarrier &carrier) {
     }
   }
 
-  // Registrér/opdatér enhed på API (unik via SAMD-ID)
   reportToApi(carrier);
 }

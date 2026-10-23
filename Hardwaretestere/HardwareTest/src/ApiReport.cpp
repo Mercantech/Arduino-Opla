@@ -121,19 +121,14 @@ bool reportToApi(MKRIoTCarrier &carrier) {
   (void)carrier;
   return false;
 #else
-  carrier.display.fillScreen(ST77XX_BLACK);
-  carrier.display.setTextColor(ST77XX_WHITE);
-  carrier.display.setTextSize(2);
-  carrier.display.setCursor(20, 60);
-  carrier.display.println(F("Sender til"));
-  carrier.display.setCursor(20, 100);
-  carrier.display.println(F("API..."));
+  clearDisplay(carrier);
+  drawCenteredF(carrier, F("Sender til"), 80, 2, ST77XX_WHITE);
+  drawCenteredF(carrier, F("API..."), 120, 2, ST77XX_CYAN);
 
   if (!wifiConnect()) {
-    carrier.display.fillScreen(ST77XX_BLACK);
-    carrier.display.setTextColor(ST77XX_YELLOW);
-    carrier.display.setCursor(15, 80);
-    carrier.display.println(F("WiFi/API skip"));
+    clearDisplay(carrier);
+    drawCenteredF(carrier, F("WiFi/API"), OLED_CY - 20, 2, ST77XX_YELLOW);
+    drawCenteredF(carrier, F("skip"), OLED_CY + 16, 2, ST77XX_YELLOW);
     delay(2000);
     return false;
   }
@@ -150,10 +145,8 @@ bool reportToApi(MKRIoTCarrier &carrier) {
     if (deviceResp.length()) {
       Serial.println(deviceResp);
     }
-    carrier.display.fillScreen(ST77XX_BLACK);
-    carrier.display.setTextColor(ST77XX_RED);
-    carrier.display.setCursor(15, 80);
-    carrier.display.println(F("API FEJL"));
+    clearDisplay(carrier);
+    drawCenteredF(carrier, F("API FEJL"), OLED_CY - 12, 2, ST77XX_RED);
     delay(2000);
     return false;
   }
@@ -176,28 +169,24 @@ bool reportToApi(MKRIoTCarrier &carrier) {
   String testResp = httpRequest("POST", testPath, testJson);
   if (testResp.length() == 0) {
     Serial.println(F("API: testrapport fejlede"));
-    carrier.display.fillScreen(ST77XX_BLACK);
-    carrier.display.setTextColor(ST77XX_RED);
-    carrier.display.setCursor(15, 60);
-    carrier.display.println(F("Device OK"));
-    carrier.display.setCursor(15, 100);
-    carrier.display.println(F("Test FEJL"));
+    clearDisplay(carrier);
+    drawCenteredF(carrier, F("Device OK"), 80, 2, ST77XX_YELLOW);
+    drawCenteredF(carrier, F("Test FEJL"), 120, 2, ST77XX_RED);
     delay(2500);
     return false;
   }
 
   Serial.println(F("API: enhed registreret/opdateret + testrapport gemt"));
-  carrier.display.fillScreen(ST77XX_BLACK);
-  carrier.display.setTextColor(ST77XX_GREEN);
-  carrier.display.setTextSize(2);
-  carrier.display.setCursor(20, 40);
-  carrier.display.println(F("API OK"));
-  carrier.display.setTextSize(1);
-  carrier.display.setTextColor(ST77XX_WHITE);
-  carrier.display.setCursor(10, 90);
-  carrier.display.println(F("ID (SAMD):"));
-  carrier.display.setCursor(10, 110);
-  carrier.display.println(g_samdId);
+  clearDisplay(carrier);
+  drawCenteredF(carrier, F("API OK"), 55, 3, ST77XX_GREEN);
+  drawCenteredF(carrier, F("SAMD"), 110, 1, ST77XX_WHITE);
+  char samdA[20], samdB[20];
+  strncpy(samdA, g_samdId, 16);
+  samdA[16] = '\0';
+  strncpy(samdB, g_samdId + 16, 16);
+  samdB[16] = '\0';
+  drawCentered(carrier, samdA, 130, 1, ST77XX_YELLOW);
+  drawCentered(carrier, samdB, 146, 1, ST77XX_YELLOW);
   delay(3000);
   return true;
 #endif

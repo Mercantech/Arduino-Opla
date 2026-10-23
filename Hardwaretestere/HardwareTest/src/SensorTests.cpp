@@ -1,33 +1,27 @@
 #include "Hardwaretestere.h"
 #include <SD.h>
+#include <math.h>
 
 bool testHumidityTemperature(MKRIoTCarrier &carrier) {
-  carrier.display.fillScreen(ST77XX_BLACK);
-  carrier.display.setTextColor(ST77XX_WHITE);
-  carrier.display.setTextSize(2);
-  carrier.display.setCursor(20, 20);
-  carrier.display.println(F("Temp & Fugt"));
-  carrier.display.setCursor(20, 50);
-  carrier.display.println(F("Test"));
+  clearDisplay(carrier);
+  drawCenteredF(carrier, F("Temp & Fugt"), OLED_CY - 12, 2, ST77XX_WHITE);
   delay(1000);
 
   bool ok = false;
   float temperature = 0;
   float humidity = 0;
+  char line[32];
 
   for (int i = 0; i < 5; i++) {
     temperature = carrier.Env.readTemperature();
     humidity = carrier.Env.readHumidity();
 
-    carrier.display.fillRect(0, 80, 240, 160, ST77XX_BLACK);
-    carrier.display.setCursor(20, 80);
-    carrier.display.print(F("Temp: "));
-    carrier.display.print(temperature);
-    carrier.display.println(F(" C"));
-    carrier.display.setCursor(20, 120);
-    carrier.display.print(F("Fugt: "));
-    carrier.display.print(humidity);
-    carrier.display.println(F(" %"));
+    clearDisplay(carrier);
+    drawCenteredF(carrier, F("Temp & Fugt"), 45, 2, ST77XX_CYAN);
+    snprintf(line, sizeof(line), "%.1f C", temperature);
+    drawCentered(carrier, line, 100, 3, ST77XX_WHITE);
+    snprintf(line, sizeof(line), "%.0f %%", humidity);
+    drawCentered(carrier, line, 145, 2, ST77XX_WHITE);
 
     Serial.print(F("Temperatur: "));
     Serial.print(temperature);
@@ -47,33 +41,28 @@ bool testHumidityTemperature(MKRIoTCarrier &carrier) {
 }
 
 bool testPressureSensor(MKRIoTCarrier &carrier) {
-  carrier.display.fillScreen(ST77XX_BLACK);
-  carrier.display.setTextColor(ST77XX_WHITE);
-  carrier.display.setTextSize(2);
-  carrier.display.setCursor(20, 20);
-  carrier.display.println(F("Tryk Sensor"));
+  clearDisplay(carrier);
+  drawCenteredF(carrier, F("Tryk"), OLED_CY - 12, 2, ST77XX_WHITE);
   delay(1000);
 
   bool ok = false;
   float pressure = 0;
+  char line[32];
 
   for (int i = 0; i < 5; i++) {
     pressure = carrier.Pressure.readPressure();
 
-    carrier.display.fillRect(0, 80, 240, 160, ST77XX_BLACK);
-    carrier.display.setCursor(20, 80);
-    carrier.display.print(F("Tryk: "));
-    carrier.display.print(pressure);
-    carrier.display.println(F(" kPa"));
-    carrier.display.setCursor(20, 120);
-    carrier.display.print(pressure * 10);
-    carrier.display.println(F(" hPa"));
+    clearDisplay(carrier);
+    drawCenteredF(carrier, F("Tryk"), 50, 2, ST77XX_CYAN);
+    snprintf(line, sizeof(line), "%.2f kPa", pressure);
+    drawCentered(carrier, line, 105, 2, ST77XX_WHITE);
+    snprintf(line, sizeof(line), "%.0f hPa", pressure * 10);
+    drawCentered(carrier, line, 145, 2, ST77XX_WHITE);
 
     Serial.print(F("Tryk: "));
     Serial.print(pressure);
     Serial.println(F(" kPa"));
 
-    // LPS22: typisk ~100 kPa ved havniveau (bibliotek kan også give hPa)
     if (pressure > 20 && pressure < 2000) {
       ok = true;
     }
@@ -85,40 +74,31 @@ bool testPressureSensor(MKRIoTCarrier &carrier) {
 }
 
 bool testIMU(MKRIoTCarrier &carrier) {
-  carrier.display.fillScreen(ST77XX_BLACK);
-  carrier.display.setTextColor(ST77XX_WHITE);
-  carrier.display.setTextSize(2);
-  carrier.display.setCursor(20, 20);
-  carrier.display.println(F("IMU Sensor"));
-  carrier.display.setCursor(20, 50);
-  carrier.display.println(F("Bevoeg kortet"));
+  clearDisplay(carrier);
+  drawCenteredF(carrier, F("IMU"), 55, 3, ST77XX_WHITE);
+  drawCenteredF(carrier, F("Bevoeg kortet"), 120, 2, ST77XX_CYAN);
   delay(2000);
 
   float ax, ay, az, gx, gy, gz;
   bool accelOk = false;
   bool gyroOk = false;
   unsigned long startTime = millis();
+  char line[40];
 
   while (millis() - startTime < 10000) {
-    carrier.display.fillRect(0, 90, 240, 150, ST77XX_BLACK);
-    carrier.display.setTextSize(1);
+    clearDisplay(carrier);
+    drawCenteredF(carrier, F("IMU"), 40, 2, ST77XX_CYAN);
 
     if (carrier.IMUmodule.accelerationAvailable()) {
       carrier.IMUmodule.readAcceleration(ax, ay, az);
-      carrier.display.setCursor(20, 95);
-      carrier.display.print(F("A X:"));
-      carrier.display.print(ax);
-      carrier.display.print(F(" Y:"));
-      carrier.display.print(ay);
-      carrier.display.print(F(" Z:"));
-      carrier.display.println(az);
+      snprintf(line, sizeof(line), "A %.1f %.1f %.1f", ax, ay, az);
+      drawCentered(carrier, line, 90, 1, ST77XX_WHITE);
       Serial.print(F("Accel X:"));
       Serial.print(ax);
       Serial.print(F(" Y:"));
       Serial.print(ay);
       Serial.print(F(" Z:"));
       Serial.println(az);
-      // Z ca. 1g i ro
       if (fabs(ax) < 5 && fabs(ay) < 5 && fabs(az) < 5) {
         accelOk = true;
       }
@@ -126,13 +106,8 @@ bool testIMU(MKRIoTCarrier &carrier) {
 
     if (carrier.IMUmodule.gyroscopeAvailable()) {
       carrier.IMUmodule.readGyroscope(gx, gy, gz);
-      carrier.display.setCursor(20, 130);
-      carrier.display.print(F("G X:"));
-      carrier.display.print(gx);
-      carrier.display.print(F(" Y:"));
-      carrier.display.print(gy);
-      carrier.display.print(F(" Z:"));
-      carrier.display.println(gz);
+      snprintf(line, sizeof(line), "G %.0f %.0f %.0f", gx, gy, gz);
+      drawCentered(carrier, line, 120, 1, ST77XX_WHITE);
       Serial.print(F("Gyro X:"));
       Serial.print(gx);
       Serial.print(F(" Y:"));
@@ -151,16 +126,10 @@ bool testIMU(MKRIoTCarrier &carrier) {
 }
 
 bool testRGBGestureSensor(MKRIoTCarrier &carrier) {
-  carrier.display.fillScreen(ST77XX_BLACK);
-  carrier.display.setTextColor(ST77XX_WHITE);
-  carrier.display.setTextSize(2);
-  carrier.display.setCursor(40, 20);
-  carrier.display.println(F("RGB & Gesture"));
-  carrier.display.setTextSize(1);
-  carrier.display.setCursor(20, 60);
-  carrier.display.println(F("Bevaeg haanden over sensor"));
-  carrier.display.setCursor(20, 75);
-  carrier.display.println(F("OP/NED/VENSTRE/HOJRE"));
+  clearDisplay(carrier);
+  drawCenteredF(carrier, F("RGB Gesture"), 50, 2, ST77XX_WHITE);
+  drawCenteredF(carrier, F("Sving haanden"), 100, 1, ST77XX_CYAN);
+  drawCenteredF(carrier, F("OP NED V H"), 120, 1, ST77XX_CYAN);
   delay(2500);
 
   int r, g, b;
@@ -170,94 +139,76 @@ bool testRGBGestureSensor(MKRIoTCarrier &carrier) {
   unsigned long startTime = millis();
   int detectedGestures = 0;
   bool gestureDetected[4] = {false, false, false, false};
+  char line[40];
 
   while ((millis() - startTime < 25000) && detectedGestures < 4) {
-    carrier.display.fillRect(0, 100, 240, 140, ST77XX_BLACK);
-    carrier.display.setTextSize(1);
+    clearDisplay(carrier);
+    drawCenteredF(carrier, F("RGB Gesture"), 36, 2, ST77XX_CYAN);
 
     if (carrier.Light.colorAvailable()) {
       carrier.Light.readColor(r, g, b);
-      carrier.display.setCursor(20, 105);
-      carrier.display.print(F("R:"));
-      carrier.display.print(r);
-      carrier.display.print(F(" G:"));
-      carrier.display.print(g);
-      carrier.display.print(F(" B:"));
-      carrier.display.println(b);
-      carrier.display.fillRect(150, 105, 40, 20, carrier.display.color565(r, g, b));
-      Serial.print(F("RGB R:"));
-      Serial.print(r);
-      Serial.print(F(" G:"));
-      Serial.print(g);
-      Serial.print(F(" B:"));
-      Serial.println(b);
+      snprintf(line, sizeof(line), "R%d G%d B%d", r, g, b);
+      drawCentered(carrier, line, 70, 1, ST77XX_WHITE);
+      carrier.display.fillCircle(OLED_CX, 100, 14, carrier.display.color565(r, g, b));
       colorOk = true;
     }
 
     if (carrier.Light.proximityAvailable()) {
       proximity = carrier.Light.readProximity();
-      carrier.display.setCursor(20, 130);
-      carrier.display.print(F("Proximity: "));
-      carrier.display.println(proximity);
-      Serial.print(F("Proximity: "));
-      Serial.println(proximity);
+      snprintf(line, sizeof(line), "Prox %d", proximity);
+      drawCentered(carrier, line, 125, 1, ST77XX_WHITE);
       proxOk = true;
     }
 
     if (carrier.Light.gestureAvailable()) {
       uint8_t gesture = carrier.Light.readGesture();
-      carrier.display.setTextSize(2);
-      carrier.display.setCursor(20, 155);
-      carrier.display.print(F("G: "));
+      const char *gName = "-";
       switch (gesture) {
         case UP:
-          carrier.display.println(F("OP"));
+          gName = "OP";
           gestureDetected[0] = true;
           maybeBeep(carrier);
           break;
         case DOWN:
-          carrier.display.println(F("NED"));
+          gName = "NED";
           gestureDetected[1] = true;
           maybeBeep(carrier);
           break;
         case LEFT:
-          carrier.display.println(F("VENSTRE"));
+          gName = "VENSTRE";
           gestureDetected[2] = true;
           maybeBeep(carrier);
           break;
         case RIGHT:
-          carrier.display.println(F("HOJRE"));
+          gName = "HOJRE";
           gestureDetected[3] = true;
           maybeBeep(carrier);
           break;
         default:
-          carrier.display.println(F("-"));
           break;
       }
+      drawCentered(carrier, gName, 155, 2, ST77XX_YELLOW);
       detectedGestures = 0;
       for (int i = 0; i < 4; i++) {
         if (gestureDetected[i]) detectedGestures++;
       }
+      snprintf(line, sizeof(line), "%d/4", detectedGestures);
+      drawCentered(carrier, line, 185, 1, ST77XX_WHITE);
     }
 
     delay(100);
   }
 
-  // Farve + proximity er nok til PASS; gesture er bonus (manuel)
   bool ok = colorOk && proxOk;
   showTestResult(carrier, "RGB/Prox", ok);
   return ok;
 }
 
 bool testSDCard(MKRIoTCarrier &carrier) {
-  carrier.display.fillScreen(ST77XX_BLACK);
-  carrier.display.setTextColor(ST77XX_WHITE);
-  carrier.display.setTextSize(2);
-  carrier.display.setCursor(20, 20);
-  carrier.display.println(F("SD Kort"));
+  clearDisplay(carrier);
+  drawCenteredF(carrier, F("SD Kort"), OLED_CY - 12, 2, ST77XX_WHITE);
   delay(800);
 
-  // SD initialiseres typisk i carrier.begin(); prøv alligevel
   bool ok = false;
   const char *path = "oplatest.txt";
   const char *payload = "opla-ok";

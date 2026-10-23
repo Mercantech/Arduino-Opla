@@ -1,30 +1,14 @@
 #include "Hardwaretestere.h"
-
-// Vi bruger denne fil til at implementere yderligere skærmfunktioner
-// efter behov. I denne simple skærmtest bruger vi hovedsageligt 
-// funktionerne direkte i Hardwaretestere.ino-filen.
-
-// Her kan du tilføje mere avancerede skærmfunktioner, hvis du får
-// brug for det senere, f.eks.:
+#include <math.h>
 
 void initOLEDScreen(MKRIoTCarrier &carrier) {
-  // Ryd skærmen
-  carrier.display.fillScreen(ST77XX_BLACK);
+  clearDisplay(carrier);
 }
 
 bool testOLEDScreen(MKRIoTCarrier &carrier) {
-  carrier.display.setTextSize(2);
-  carrier.display.setTextColor(ST77XX_WHITE);
-
-  int textWidth = 9 * 10;
-  int xPosition = (240 - textWidth) / 2;
-  carrier.display.setCursor(xPosition, 30);
-  carrier.display.println("OLED Test");
-
-  textWidth = 12 * 10;
-  xPosition = (240 - textWidth) / 2;
-  carrier.display.setCursor(xPosition, 70);
-  carrier.display.println("Arduino Opla");
+  clearDisplay(carrier);
+  drawCentered(carrier, "OLED Test", 70, 2, ST77XX_WHITE);
+  drawCentered(carrier, "Arduino Opla", 110, 2, ST77XX_CYAN);
   delay(2000);
 
   testFarver(carrier);
@@ -37,127 +21,52 @@ bool testOLEDScreen(MKRIoTCarrier &carrier) {
 }
 
 void testFarver(MKRIoTCarrier &carrier) {
-  // Test forskellige farver
-  carrier.display.fillScreen(ST77XX_BLACK);
-  carrier.display.setTextSize(2);
-  
-  int yPosition = 20;
-  int xPosition;
-  
-  // Rød tekst - centreret
-  xPosition = (240 - 9 * 10) / 2; // "Rod tekst" er 9 tegn
-  carrier.display.setTextColor(ST77XX_RED);
-  carrier.display.setCursor(xPosition, yPosition);
-  carrier.display.println("Rod tekst");
-  delay(1000);
-  
-  // Grøn tekst - centreret
-  yPosition += 30;
-  xPosition = (240 - 10 * 10) / 2; // "Gron tekst" er 10 tegn
-  carrier.display.setTextColor(ST77XX_GREEN);
-  carrier.display.setCursor(xPosition, yPosition);
-  carrier.display.println("Gron tekst");
-  delay(1000);
-  
-  // Blå tekst - centreret
-  yPosition += 30;
-  xPosition = (240 - 9 * 10) / 2; // "Bla tekst" er 9 tegn
-  carrier.display.setTextColor(ST77XX_BLUE);
-  carrier.display.setCursor(xPosition, yPosition);
-  carrier.display.println("Bla tekst");
-  delay(1000);
-  
-  // Gul tekst - centreret
-  yPosition += 30;
-  xPosition = (240 - 9 * 10) / 2; // "Gul tekst" er 9 tegn
-  carrier.display.setTextColor(ST77XX_YELLOW);
-  carrier.display.setCursor(xPosition, yPosition);
-  carrier.display.println("Gul tekst");
-  delay(1000);
-  
-  // Cyan tekst - centreret
-  yPosition += 30;
-  xPosition = (240 - 10 * 10) / 2; // "Cyan tekst" er 10 tegn
-  carrier.display.setTextColor(ST77XX_CYAN);
-  carrier.display.setCursor(xPosition, yPosition);
-  carrier.display.println("Cyan tekst");
-  delay(1000);
-  
-  // Magenta tekst - centreret
-  yPosition += 30;
-  xPosition = (240 - 13 * 10) / 2; // "Magenta tekst" er 13 tegn
-  carrier.display.setTextColor(ST77XX_MAGENTA);
-  carrier.display.setCursor(xPosition, yPosition);
-  carrier.display.println("Magenta tekst");
-  delay(2000);
+  clearDisplay(carrier);
+  const char *labels[] = {"Rod", "Gron", "Bla", "Gul", "Cyan", "Magenta"};
+  uint16_t colors[] = {
+      ST77XX_RED, ST77XX_GREEN, ST77XX_BLUE,
+      ST77XX_YELLOW, ST77XX_CYAN, ST77XX_MAGENTA};
+
+  for (int i = 0; i < 6; i++) {
+    clearDisplay(carrier);
+    drawCentered(carrier, labels[i], OLED_CY - 8, 3, colors[i]);
+    delay(700);
+  }
 }
 
 void testTekstStorrelse(MKRIoTCarrier &carrier) {
-  carrier.display.fillScreen(ST77XX_BLACK);
-  carrier.display.setTextColor(ST77XX_WHITE);
-  
-  // Størrelse 1 - centreret
-  carrier.display.setTextSize(1);
-  int textWidth = 16 * 6; // "Tekststorrelse 1" er 16 tegn, og tekststørrelse 1 er ca. 6 pixels per tegn
-  int xPosition = (240 - textWidth) / 2;
-  carrier.display.setCursor(xPosition, 30);
-  carrier.display.println("Tekststorrelse 1");
-  
-  // Størrelse 2 - centreret
-  carrier.display.setTextSize(2);
-  textWidth = 11 * 12; // "Storrelse 2" er 11 tegn, tekststørrelse 2 er ca. 12 pixels per tegn
-  xPosition = (240 - textWidth) / 2;
-  carrier.display.setCursor(xPosition, 60);
-  carrier.display.println("Storrelse 2");
-  
-  // Størrelse 3 - centreret
-  carrier.display.setTextSize(3);
-  textWidth = 5 * 18; // "Str 3" er 5 tegn, tekststørrelse 3 er ca. 18 pixels per tegn
-  xPosition = (240 - textWidth) / 2;
-  carrier.display.setCursor(xPosition, 100);
-  carrier.display.println("Str 3");
-  
-  // Størrelse 4 - centreret
-  carrier.display.setTextSize(4);
-  textWidth = 5 * 24; // "Str 4" er 5 tegn, tekststørrelse 4 er ca. 24 pixels per tegn
-  xPosition = (240 - textWidth) / 2;
-  carrier.display.setCursor(xPosition, 150);
-  carrier.display.println("Str 4");
-  
-  delay(3000);
+  clearDisplay(carrier);
+  drawCentered(carrier, "Size 1", 50, 1, ST77XX_WHITE);
+  drawCentered(carrier, "Size 2", 80, 2, ST77XX_WHITE);
+  drawCentered(carrier, "Size 3", 120, 3, ST77XX_WHITE);
+  delay(2500);
 }
 
 void drawCircleTest(MKRIoTCarrier &carrier) {
-  carrier.display.fillScreen(ST77XX_BLACK);
-  
-  // Tegn cirkler med forskellige farver
-  carrier.display.fillCircle(80, 60, 30, ST77XX_RED);
-  carrier.display.fillCircle(160, 60, 30, ST77XX_GREEN);
-  carrier.display.fillCircle(240, 60, 30, ST77XX_BLUE);
-  
-  carrier.display.fillCircle(80, 140, 30, ST77XX_YELLOW);
-  carrier.display.fillCircle(160, 140, 30, ST77XX_MAGENTA);
-  carrier.display.fillCircle(240, 140, 30, ST77XX_CYAN);
-  
+  clearDisplay(carrier);
+  // Cirkler inden for den runde skærm (ikke ud over kanten)
+  carrier.display.fillCircle(OLED_CX - 45, OLED_CY - 35, 28, ST77XX_RED);
+  carrier.display.fillCircle(OLED_CX + 45, OLED_CY - 35, 28, ST77XX_GREEN);
+  carrier.display.fillCircle(OLED_CX - 45, OLED_CY + 40, 28, ST77XX_YELLOW);
+  carrier.display.fillCircle(OLED_CX + 45, OLED_CY + 40, 28, ST77XX_MAGENTA);
+  carrier.display.fillCircle(OLED_CX, OLED_CY, 18, ST77XX_CYAN);
   delay(2000);
 }
 
 void drawGraphicsTest(MKRIoTCarrier &carrier) {
-  carrier.display.fillScreen(ST77XX_BLACK);
-  
-  // Tegn linjer
-  for (int i = 0; i < 240; i += 10) {
-    carrier.display.drawLine(0, 0, i, 240, ST77XX_WHITE);
+  clearDisplay(carrier);
+  // Linjer fra centrum — synlige på rund skærm
+  for (int a = 0; a < 360; a += 15) {
+    float rad = a * 3.14159f / 180.0f;
+    int x2 = OLED_CX + (int)(95 * cos(rad));
+    int y2 = OLED_CY + (int)(95 * sin(rad));
+    carrier.display.drawLine(OLED_CX, OLED_CY, x2, y2, ST77XX_WHITE);
   }
-  
   delay(1000);
-  carrier.display.fillScreen(ST77XX_BLACK);
-  
-  // Tegn rektangler
-  carrier.display.drawRect(20, 20, 100, 60, ST77XX_RED);
-  carrier.display.fillRect(150, 20, 80, 60, ST77XX_GREEN);
-  carrier.display.drawRoundRect(20, 100, 100, 60, 10, ST77XX_BLUE);
-  carrier.display.fillRoundRect(150, 100, 80, 60, 10, ST77XX_YELLOW);
-  
+
+  clearDisplay(carrier);
+  carrier.display.drawCircle(OLED_CX, OLED_CY, 100, ST77XX_CYAN);
+  carrier.display.drawCircle(OLED_CX, OLED_CY, 70, ST77XX_GREEN);
+  carrier.display.fillRoundRect(OLED_CX - 40, OLED_CY - 25, 80, 50, 10, ST77XX_YELLOW);
   delay(2000);
 }

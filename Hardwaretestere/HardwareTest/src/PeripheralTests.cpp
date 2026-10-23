@@ -1,25 +1,24 @@
 #include "Hardwaretestere.h"
 
 bool testRelays(MKRIoTCarrier &carrier) {
-  carrier.display.fillScreen(ST77XX_BLACK);
-  carrier.display.setTextColor(ST77XX_WHITE);
-  carrier.display.setTextSize(2);
-  carrier.display.setCursor(20, 20);
-  carrier.display.println(F("Relay Test"));
+  clearDisplay(carrier);
+  drawCenteredF(carrier, F("Relay"), OLED_CY - 12, 2, ST77XX_WHITE);
   delay(800);
 
-  carrier.display.setCursor(20, 60);
-  carrier.display.println(F("Relay 1 ON"));
+  clearDisplay(carrier);
+  drawCenteredF(carrier, F("Relay 1 ON"), OLED_CY - 12, 2, ST77XX_YELLOW);
   carrier.Relay1.open();
   delay(800);
   carrier.Relay1.close();
 
-  carrier.display.setCursor(20, 90);
-  carrier.display.println(F("Relay 2 ON"));
+  clearDisplay(carrier);
+  drawCenteredF(carrier, F("Relay 2 ON"), OLED_CY - 12, 2, ST77XX_YELLOW);
   carrier.Relay2.open();
   delay(800);
   carrier.Relay2.close();
 
+  clearDisplay(carrier);
+  drawCenteredF(carrier, F("Begge ON"), OLED_CY - 12, 2, ST77XX_YELLOW);
   carrier.Relay1.open();
   carrier.Relay2.open();
   delay(500);
@@ -31,29 +30,25 @@ bool testRelays(MKRIoTCarrier &carrier) {
 }
 
 bool testButtons(MKRIoTCarrier &carrier) {
-  carrier.display.fillScreen(ST77XX_BLACK);
-  carrier.display.setTextColor(ST77XX_WHITE);
-  carrier.display.setTextSize(2);
-  carrier.display.setCursor(20, 20);
-  carrier.display.println(F("Knap Test"));
-  carrier.display.setCursor(20, 50);
-  carrier.display.println(F("Tryk alle 5"));
+  clearDisplay(carrier);
+  drawCenteredF(carrier, F("Knapper"), 55, 2, ST77XX_WHITE);
+  drawCenteredF(carrier, F("Tryk alle 5"), 110, 2, ST77XX_CYAN);
 
   unsigned long startTime = millis();
   bool buttonPressed[5] = {false, false, false, false, false};
   bool allButtonsPressed = false;
   touchButtons buttons[5] = {TOUCH0, TOUCH1, TOUCH2, TOUCH3, TOUCH4};
+  char line[24];
 
   while (!allButtonsPressed && (millis() - startTime < 30000)) {
     carrier.Buttons.update();
     for (int i = 0; i < 5; i++) {
       if (carrier.Buttons.onTouchDown(buttons[i])) {
         buttonPressed[i] = true;
-        carrier.display.fillRect(0, 110 + (i * 22), 240, 22, ST77XX_BLACK);
-        carrier.display.setCursor(20, 110 + (i * 22));
-        carrier.display.print(F("Knap "));
-        carrier.display.print(i);
-        carrier.display.println(F(" OK"));
+        clearDisplay(carrier);
+        snprintf(line, sizeof(line), "Knap %d", i);
+        drawCentered(carrier, line, OLED_CY - 28, 3, ST77XX_GREEN);
+        drawCenteredF(carrier, F("OK"), OLED_CY + 20, 2, ST77XX_WHITE);
         Serial.print(F("Knap "));
         Serial.print(i);
         Serial.println(F(" trykket"));
@@ -75,16 +70,17 @@ bool testButtons(MKRIoTCarrier &carrier) {
 }
 
 bool testLEDs(MKRIoTCarrier &carrier) {
-  carrier.display.fillScreen(ST77XX_BLACK);
-  carrier.display.setTextColor(ST77XX_WHITE);
-  carrier.display.setTextSize(2);
-  carrier.display.setCursor(20, 20);
-  carrier.display.println(F("LED Test"));
+  clearDisplay(carrier);
+  drawCenteredF(carrier, F("LED"), OLED_CY - 12, 3, ST77XX_WHITE);
   delay(500);
 
   carrier.leds.setBrightness(255);
+  char line[16];
 
   for (int led = 0; led < 5; led++) {
+    snprintf(line, sizeof(line), "LED %d", led);
+    clearDisplay(carrier);
+    drawCentered(carrier, line, OLED_CY - 12, 3, ST77XX_WHITE);
     carrier.leds.clear();
     carrier.leds.setPixelColor(led, 255, 0, 0);
     carrier.leds.show();
@@ -105,6 +101,8 @@ bool testLEDs(MKRIoTCarrier &carrier) {
       carrier.leds.Color(0, 255, 255),
       carrier.leds.Color(255, 0, 255)};
 
+  clearDisplay(carrier);
+  drawCenteredF(carrier, F("Alle LED"), OLED_CY - 12, 2, ST77XX_WHITE);
   for (int c = 0; c < 6; c++) {
     carrier.leds.fill(colors[c], 0, 5);
     carrier.leds.show();
@@ -123,19 +121,16 @@ bool testBuzzer(MKRIoTCarrier &carrier) {
   Serial.println(F("Buzzer: sprunget over (ENABLE_SOUND_TEST=false)"));
   return true;
 #else
-  carrier.display.fillScreen(ST77XX_BLACK);
-  carrier.display.setTextColor(ST77XX_WHITE);
-  carrier.display.setTextSize(2);
-  carrier.display.setCursor(20, 20);
-  carrier.display.println(F("Buzzer Test"));
+  clearDisplay(carrier);
+  drawCenteredF(carrier, F("Buzzer"), OLED_CY - 12, 3, ST77XX_WHITE);
   delay(500);
 
   int tones[] = {262, 294, 330, 349, 392, 440, 494, 523};
+  char line[20];
   for (int i = 0; i < 8; i++) {
-    carrier.display.fillRect(0, 60, 240, 30, ST77XX_BLACK);
-    carrier.display.setCursor(20, 60);
-    carrier.display.print(F("Tone: "));
-    carrier.display.println(tones[i]);
+    clearDisplay(carrier);
+    snprintf(line, sizeof(line), "%d Hz", tones[i]);
+    drawCentered(carrier, line, OLED_CY - 12, 3, ST77XX_YELLOW);
     carrier.Buzzer.sound(tones[i]);
     delay(150);
     carrier.Buzzer.noSound();
@@ -143,6 +138,8 @@ bool testBuzzer(MKRIoTCarrier &carrier) {
   }
 
   for (int i = 0; i < 3; i++) {
+    clearDisplay(carrier);
+    drawCenteredF(carrier, F("Beep"), OLED_CY - 12, 3, ST77XX_WHITE);
     carrier.Buzzer.beep();
     delay(300);
   }
