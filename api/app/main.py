@@ -1,3 +1,4 @@
+import os
 import time
 
 from fastapi import Depends, FastAPI, HTTPException
@@ -9,7 +10,7 @@ from app import models, schemas
 from app.config import CORS_ORIGINS
 from app.db import Base, engine, get_db
 
-app = FastAPI(title="Arduino Opla API", version="1.0.0")
+app = FastAPI(title="Arduino Opla API", version="1.1.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -24,6 +25,9 @@ app.add_middleware(
 def on_startup():
     for attempt in range(30):
         try:
+            # Sæt RESET_DB=true én gang ved schema-skift (int-id → samd_id PK)
+            if os.getenv("RESET_DB", "false").lower() in ("1", "true", "yes"):
+                Base.metadata.drop_all(bind=engine)
             Base.metadata.create_all(bind=engine)
             return
         except OperationalError:
@@ -43,12 +47,13 @@ def api_health():
 
 @app.get("/api/devices", response_model=list[schemas.DeviceOut])
 def list_devices(db: Session = Depends(get_db)):
-    return (
+    devices = (
         db.query(models.Device)
         .options(joinedload(models.Device.tests))
         .order_by(models.Device.updated_at.desc())
         .all()
     )
+    return [schemas.DeviceOut.from_device(d) for d in devices]
 
 
 @app.post("/api/devices", response_model=schemas.DeviceOut)
@@ -72,30 +77,30 @@ def upsert_device(body: schemas.DeviceIn, db: Session = Depends(get_db)):
 
     db.commit()
     db.refresh(device)
-    return device
+    return schemas.DeviceOut.from_device(device)
 
 
-@app.get("/api/devices/{device_id}", response_model=schemas.DeviceOut)
-def get_device(device_id: int, db: Session = Depends(get_db)):
+@app.get("/api/devices/{samd_id}", response_model=schemas.DeviceOut)
+def get_device(samd_id: str, db: Session = Depends(get_db)):
     device = (
         db.query(models.Device)
         .options(joinedload(models.Device.tests))
-        .filter(models.Device.id == device_id)
+        .filter(models.Device.samd_id == samd_id)
         .first()
     )
     if device is None:
         raise HTTPException(status_code=404, detail="Device not found")
-    return device
+    return schemas.DeviceOut.from_device(device)
 
 
-@app.post("/api/devices/{device_id}/tests", response_model=schemas.TestReportOut)
-def add_test(device_id: int, body: schemas.TestReportIn, db: Session = Depends(get_db)):
-    device = db.query(models.Device).filter(models.Device.id == device_id).first()
+@app.post("/api/devices/{samd_id}/tests", response_model=schemas.TestReportOut)
+def add_test(samd_id: str, body: schemas.TestReportIn, db: Session = Depends(get_db)):
+    device = db.query(models.Device).filter(models.Device.samd_id == samd_id).first()
     if device is None:
         raise HTTPException(status_code=404, detail="Device not found")
 
     report = models.TestReport(
-        device_id=device_id,
+        samd_id=samd_id,
         passed=body.passed,
         passed_count=body.passed_count,
         failed_count=body.failed_count,

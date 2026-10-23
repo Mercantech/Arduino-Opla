@@ -43,23 +43,9 @@ static bool wifiConnect() {
   return true;
 }
 
-static int parseJsonIntField(const String &body, const char *key) {
-  String needle = String("\"") + key + "\":";
-  int idx = body.indexOf(needle);
-  if (idx < 0) {
-    return -1;
-  }
-  idx += needle.length();
-  while (idx < (int)body.length() &&
-         (body.charAt(idx) == ' ' || body.charAt(idx) == '\t')) {
-    idx++;
-  }
-  return body.substring(idx).toInt();
-}
-
 static String httpRequest(const char *method, const char *path, const char *jsonBody) {
   WiFiSSLClient client;
-  client.setTimeout(15000);
+  client.setTimeout(20000);
 
   Serial.print(F("API: "));
   Serial.print(method);
@@ -92,15 +78,35 @@ static String httpRequest(const char *method, const char *path, const char *json
     client.print(jsonBody);
   }
 
-  // Skip headers
+  unsigned long headerStart = millis();
   while (client.connected() || client.available()) {
+    if (millis() - headerStart > 20000) {
+      Serial.println(F("API: timeout (headers)"));
+      client.stop();
+      return "";
+    }
+    if (!client.available()) {
+      delay(10);
+      continue;
+    }
     String line = client.readStringUntil('\n');
     if (line == "\r" || line.length() == 0) {
       break;
     }
   }
 
-  String response = client.readString();
+  String response = "";
+  unsigned long bodyStart = millis();
+  while (millis() - bodyStart < 20000) {
+    while (client.available()) {
+      response += (char)client.read();
+      bodyStart = millis();
+    }
+    if (!client.connected() && !client.available()) {
+      break;
+    }
+    delay(10);
+  }
   client.stop();
 
   Serial.print(F("API: svar "));
@@ -132,14 +138,18 @@ bool reportToApi(MKRIoTCarrier &carrier) {
     return false;
   }
 
-  // Upsert enhed på unikt SAMD-ID (+ MAC/ECC)
+  // Upsert på unikt SAMD chip-ID
   char deviceJson[256];
   snprintf(deviceJson, sizeof(deviceJson),
            "{\"samd_id\":\"%s\",\"mac\":\"%s\",\"ecc_serial\":\"%s\",\"label\":\"Arduino Opla\"}",
            g_samdId, g_macStr, g_eccOk ? g_eccSerial : "");
 
   String deviceResp = httpRequest("POST", "/api/devices", deviceJson);
-  if (deviceResp.length() == 0) {
+  if (deviceResp.length() == 0 || deviceResp.indexOf(g_samdId) < 0) {
+    Serial.println(F("API: device upsert fejlede"));
+    if (deviceResp.length()) {
+      Serial.println(deviceResp);
+    }
     carrier.display.fillScreen(ST77XX_BLACK);
     carrier.display.setTextColor(ST77XX_RED);
     carrier.display.setCursor(15, 80);
@@ -148,24 +158,14 @@ bool reportToApi(MKRIoTCarrier &carrier) {
     return false;
   }
 
-  int deviceId = parseJsonIntField(deviceResp, "id");
-  if (deviceId <= 0) {
-    Serial.println(F("API: kunne ikke parse device id"));
-    Serial.println(deviceResp);
-    carrier.display.fillScreen(ST77XX_BLACK);
-    carrier.display.setTextColor(ST77XX_RED);
-    carrier.display.setCursor(15, 80);
-    carrier.display.println(F("API parse"));
-    delay(2000);
-    return false;
-  }
+  Serial.print(F("API: enhed ID (SAMD)="));
+  Serial.println(g_samdId);
 
-  Serial.print(F("API: enhed id="));
-  Serial.println(deviceId);
+  delay(500); // pause mellem TLS-forbindelser
 
   bool allOk = (g_testsFailed == 0);
-  char testPath[64];
-  snprintf(testPath, sizeof(testPath), "/api/devices/%d/tests", deviceId);
+  char testPath[96];
+  snprintf(testPath, sizeof(testPath), "/api/devices/%s/tests", g_samdId);
 
   char testJson[192];
   snprintf(testJson, sizeof(testJson),
@@ -190,14 +190,13 @@ bool reportToApi(MKRIoTCarrier &carrier) {
   carrier.display.fillScreen(ST77XX_BLACK);
   carrier.display.setTextColor(ST77XX_GREEN);
   carrier.display.setTextSize(2);
-  carrier.display.setCursor(20, 50);
+  carrier.display.setCursor(20, 40);
   carrier.display.println(F("API OK"));
   carrier.display.setTextSize(1);
   carrier.display.setTextColor(ST77XX_WHITE);
-  carrier.display.setCursor(20, 100);
-  carrier.display.print(F("Device #"));
-  carrier.display.println(deviceId);
-  carrier.display.setCursor(20, 120);
+  carrier.display.setCursor(10, 90);
+  carrier.display.println(F("ID (SAMD):"));
+  carrier.display.setCursor(10, 110);
   carrier.display.println(g_samdId);
   delay(3000);
   return true;

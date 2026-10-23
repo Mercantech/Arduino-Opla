@@ -7,10 +7,11 @@ from app.db import Base
 
 
 class Device(Base):
+    """Primær nøgle = SAMD chip-ID fra enheden (ikke auto-increment)."""
+
     __tablename__ = "devices"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    samd_id: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    samd_id: Mapped[str] = mapped_column(String(64), primary_key=True)
     mac: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
     ecc_serial: Mapped[str | None] = mapped_column(String(64), nullable=True)
     label: Mapped[str | None] = mapped_column(String(128), nullable=True)
@@ -30,7 +31,9 @@ class TestReport(Base):
     __tablename__ = "test_reports"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    device_id: Mapped[int] = mapped_column(ForeignKey("devices.id"), index=True)
+    samd_id: Mapped[str] = mapped_column(
+        ForeignKey("devices.samd_id"), index=True
+    )
     passed: Mapped[bool] = mapped_column(Boolean, default=False)
     passed_count: Mapped[int] = mapped_column(Integer, default=0)
     failed_count: Mapped[int] = mapped_column(Integer, default=0)
