@@ -83,7 +83,7 @@ bool testIMU(MKRIoTCarrier &carrier) {
   drawCenteredF(carrier, F("Bevoeg kortet"), 120, 2, ST77XX_CYAN);
   delay(2000);
 
-  float ax, ay, az, gx, gy, gz;
+  float ax = 0, ay = 0, az = 0, gx = 0, gy = 0, gz = 0;
   bool accelOk = false;
   bool gyroOk = false;
   unsigned long startTime = millis();
