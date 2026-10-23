@@ -45,6 +45,8 @@ class DeviceOut(BaseModel):
 
     @classmethod
     def from_device(cls, device: object) -> "DeviceOut":
+        tests = list(device.tests or [])  # type: ignore[attr-defined]
+        tests.sort(key=lambda t: t.created_at, reverse=True)
         return cls(
             id=device.samd_id,  # type: ignore[attr-defined]
             samd_id=device.samd_id,  # type: ignore[attr-defined]
@@ -53,5 +55,5 @@ class DeviceOut(BaseModel):
             label=device.label,  # type: ignore[attr-defined]
             created_at=device.created_at,  # type: ignore[attr-defined]
             updated_at=device.updated_at,  # type: ignore[attr-defined]
-            tests=list(device.tests or []),  # type: ignore[attr-defined]
+            tests=tests,
         )

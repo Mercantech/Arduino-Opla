@@ -93,8 +93,23 @@ def get_device(samd_id: str, db: Session = Depends(get_db)):
     return schemas.DeviceOut.from_device(device)
 
 
+@app.get("/api/devices/{samd_id}/tests", response_model=list[schemas.TestReportOut])
+def list_tests(samd_id: str, db: Session = Depends(get_db)):
+    """Fuld testhistorik for enheden (nyeste først)."""
+    device = db.query(models.Device).filter(models.Device.samd_id == samd_id).first()
+    if device is None:
+        raise HTTPException(status_code=404, detail="Device not found")
+    return (
+        db.query(models.TestReport)
+        .filter(models.TestReport.samd_id == samd_id)
+        .order_by(models.TestReport.created_at.desc())
+        .all()
+    )
+
+
 @app.post("/api/devices/{samd_id}/tests", response_model=schemas.TestReportOut)
 def add_test(samd_id: str, body: schemas.TestReportIn, db: Session = Depends(get_db)):
+    """Tilføj ny testrapport — sletter aldrig gamle (fuld historik)."""
     device = db.query(models.Device).filter(models.Device.samd_id == samd_id).first()
     if device is None:
         raise HTTPException(status_code=404, detail="Device not found")
@@ -107,6 +122,10 @@ def add_test(samd_id: str, body: schemas.TestReportIn, db: Session = Depends(get
         details=body.details,
     )
     db.add(report)
+    # Touch enhed så den sorterer øverst ved ny test (metadata opdateres ikke slettet)
+    from datetime import datetime, timezone
+
+    device.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(report)
     return report
