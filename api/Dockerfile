@@ -1,5 +1,8 @@
 FROM python:3.12-slim
 
+# bust cache when forcing rebuild of app layer
+ARG CACHEBUST=2026-10-23-samd-pk
+
 WORKDIR /app
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
