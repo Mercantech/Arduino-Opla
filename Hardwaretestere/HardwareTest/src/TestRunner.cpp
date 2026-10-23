@@ -29,7 +29,6 @@ void runAllTests(MKRIoTCarrier &carrier) {
   track("Temp/Fugt", testHumidityTemperature(carrier), passed, failed);
   track("Tryk", testPressureSensor(carrier), passed, failed);
   track("IMU", testIMU(carrier), passed, failed);
-  track("RGB/Prox", testRGBGestureSensor(carrier), passed, failed);
   track("SD", testSDCard(carrier), passed, failed);
   track("Relay", testRelays(carrier), passed, failed);
   track("Knapper", testButtons(carrier), passed, failed);

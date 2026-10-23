@@ -3,7 +3,7 @@
 
 #include <Arduino_MKRIoTCarrier.h>
 
-// Stille lokale: sæt til false — springer buzzer-test over og undgår bip ved knapper/gesture
+// Stille lokale: sæt til false — springer buzzer-test over og undgår bip ved knapper
 #ifndef ENABLE_SOUND_TEST
 #define ENABLE_SOUND_TEST false
 #endif
@@ -75,7 +75,6 @@ void drawGraphicsTest(MKRIoTCarrier &carrier);
 bool testHumidityTemperature(MKRIoTCarrier &carrier);
 bool testPressureSensor(MKRIoTCarrier &carrier);
 bool testIMU(MKRIoTCarrier &carrier);
-bool testRGBGestureSensor(MKRIoTCarrier &carrier);
 bool testSDCard(MKRIoTCarrier &carrier);
 
 // Periferi

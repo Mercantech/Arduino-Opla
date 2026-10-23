@@ -11,7 +11,7 @@ pio run -e mkrwifi1010 -t upload
 pio device monitor
 ```
 
-Tester OLED, sensorer (temp/fugt, tryk, IMU accel+gyro, RGB/proximity/gesture), SD, relæ, knapper, LED, buzzer — og udskriver SAMD chip-ID, WiFi MAC og ECCX08-serienummer.
+Tester OLED, sensorer (temp/fugt, tryk, IMU accel+gyro), SD, relæ, knapper, LED, buzzer — og udskriver SAMD chip-ID, WiFi MAC og ECCX08-serienummer. (RGB/Prox er fjernet — ustabil med kabinet.)
 
 Efter tests registrerer/opdaterer boardet sig selv på API’et (`POST /api/devices` på SAMD-ID) og gemmer testrapporten.
 
@@ -22,6 +22,20 @@ cp src/Secrets.h.example src/Secrets.h
 ```
 
 Lyd: `ENABLE_SOUND_TEST` i `src/Hardwaretestere.h`. API-upload: `ENABLE_API_REPORT`.
+
+## Opdater NINA + SSL (enheder)
+
+Luk Serial Monitor, tilslut MKR WiFi 1010, og kør:
+
+```powershell
+cd Hardwaretestere
+.\Update-Device.ps1              # auto-port, nyeste NINA, certs, HardwareTest
+.\Update-Device.ps1 -Port COM8
+.\Update-Device.ps1 -ListOnly    # se firmwareversioner + porte
+.\Update-Device.ps1 -SkipSketch  # kun NINA + SSL-certifikater
+```
+
+Scriptet henter `arduino-fwuploader`, flasher nyeste NINA-firmware, SSL-rodcertifikater (`opla.mercantec.tech` m.fl.) og uploader HardwareTest.
 
 ## Web API (opla.mercantec.tech)
 

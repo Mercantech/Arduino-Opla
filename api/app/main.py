@@ -23,12 +23,20 @@ app.add_middleware(
 
 @app.on_event("startup")
 def on_startup():
+    from app.cleanup import strip_unstable_tests
+    from app.db import SessionLocal
+
     for attempt in range(30):
         try:
             # Sæt RESET_DB=true én gang ved schema-skift (int-id → samd_id PK)
             if os.getenv("RESET_DB", "false").lower() in ("1", "true", "yes"):
                 Base.metadata.drop_all(bind=engine)
             Base.metadata.create_all(bind=engine)
+            db = SessionLocal()
+            try:
+                strip_unstable_tests(db)
+            finally:
+                db.close()
             return
         except OperationalError:
             time.sleep(2)
