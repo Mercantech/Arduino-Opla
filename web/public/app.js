@@ -76,7 +76,7 @@ function renderHome() {
     <header class="hero">
       <p class="status-pill" id="health"></p>
       <h1 class="hero-brand">Opla</h1>
-      <p class="hero-line">Hardware-test og enhedsregistrering for Arduino Oplà — fuld historik pr. SAMD-ID.</p>
+      <p class="hero-line">Hardware-test og enhedsregistrering for Arduino Opla. Fuld historik pr. SAMD-ID.</p>
       <div class="hero-actions">
         <button class="btn btn-primary" type="button" id="btn-refresh">Opdater liste</button>
         <a class="btn btn-ghost" href="https://docs.arduino.cc/tutorials/mkr-iot-carrier/mkr-iot-carrier-01-technical-reference" target="_blank" rel="noreferrer">Carrier docs</a>
@@ -174,7 +174,7 @@ function renderDevice() {
       <div class="section-head">
         <div>
           <h2>Testhistorik</h2>
-          <p>Nyeste først — klik for fulde detaljer</p>
+          <p>Nyeste foerst · klik for fulde detaljer</p>
         </div>
       </div>
       <div class="timeline" id="timeline"></div>
