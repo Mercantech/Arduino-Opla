@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Arduino Opla</title>
+  <style>
+    :root {
+      --bg: #0b1c1e;
+      --fg: #ecf1f1;
+      --accent: #008184;
+      --muted: #aeb8b8;
+      --ok: #16a588;
+      --bad: #e6195e;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: radial-gradient(ellipse at top, #143033 0%, var(--bg) 55%);
+      color: var(--fg);
+      min-height: 100vh;
+      padding: 2rem 1.25rem 3rem;
+    }
+    h1 { font-size: clamp(1.8rem, 4vw, 2.6rem); margin: 0 0 0.35rem; letter-spacing: -0.02em; }
+    p.lead { color: var(--muted); margin: 0 0 1.5rem; }
+    .status { display: inline-flex; gap: 0.5rem; align-items: center; margin-bottom: 1.5rem; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); }
+    .dot.ok { background: var(--ok); }
+    .dot.bad { background: var(--bad); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+    th, td { text-align: left; padding: 0.65rem 0.5rem; border-bottom: 1px solid #2c353a; }
+    th { color: var(--muted); font-weight: 600; }
+    code { font-family: ui-monospace, monospace; font-size: 0.85em; }
+    a { color: var(--accent); }
+  </style>
+</head>
+<body>
+  <h1>Arduino Opla</h1>
+  <p class="lead">Enhedsregistrering og hardware-tests</p>
+  <div class="status">
+    <span class="dot" id="dot"></span>
+    <span id="health">Tjekker API…</span>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>SAMD</th>
+        <th>MAC</th>
+        <th>Label</th>
+        <th>Seneste test</th>
+      </tr>
+    </thead>
+    <tbody id="rows">
+      <tr><td colspan="5">Henter enheder…</td></tr>
+    </tbody>
+  </table>
+  <script>
+    async function load() {
+      const dot = document.getElementById("dot");
+      const healthEl = document.getElementById("health");
+      const rows = document.getElementById("rows");
+      try {
+        const h = await fetch("/api/health");
+        if (!h.ok) throw new Error("health " + h.status);
+        dot.className = "dot ok";
+        healthEl.textContent = "API online";
+      } catch (e) {
+        dot.className = "dot bad";
+        healthEl.textContent = "API ikke tilgængelig";
+      }
+      try {
+        const res = await fetch("/api/devices");
+        const devices = await res.json();
+        if (!devices.length) {
+          rows.innerHTML = "<tr><td colspan='5'>Ingen enheder endnu. POST /api/devices</td></tr>";
+          return;
+        }
+        rows.innerHTML = devices.map(d => {
+          const latest = (d.tests || []).slice().sort((a,b) => new Date(b.created_at) - new Date(a.created_at))[0];
+          const testTxt = latest
+            ? (latest.passed ? "OK" : "FEJL") + ` (${latest.passed_count}/${latest.passed_count + latest.failed_count})`
+            : "—";
+          return `<tr>
+            <td>${d.id}</td>
+            <td><code>${d.samd_id}</code></td>
+            <td><code>${d.mac || "—"}</code></td>
+            <td>${d.label || "—"}</td>
+            <td>${testTxt}</td>
+          </tr>`;
+        }).join("");
+      } catch (e) {
+        rows.innerHTML = "<tr><td colspan='5'>Kunne ikke hente enheder</td></tr>";
+      }
+    }
+    load();
+    setInterval(load, 15000);
+  </script>
+</body>
+</html>

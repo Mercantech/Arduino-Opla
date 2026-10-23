@@ -1,0 +1,53 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-opla}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD required}
+      POSTGRES_DB: ${POSTGRES_DB:-opla}
+    volumes:
+      - opla_pgdata:/var/lib/postgresql/data
+    networks:
+      default:
+        aliases:
+          - opla-db
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-opla} -d ${POSTGRES_DB:-opla}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: ./api
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://opla:${POSTGRES_PASSWORD}@opla-db:5432/opla}
+      CORS_ORIGINS: ${CORS_ORIGINS:-https://opla.mercantec.tech}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      default:
+        aliases:
+          - opla-api
+
+  web:
+    build: ./web
+    restart: unless-stopped
+    depends_on:
+      - api
+    networks:
+      - default
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=dokploy-network
+      - traefik.http.services.opla-web.loadbalancer.server.port=3000
+
+networks:
+  default:
+    name: dokploy-network
+    external: true
+
+volumes:
+  opla_pgdata:

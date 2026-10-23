@@ -12,48 +12,28 @@ void initOLEDScreen(MKRIoTCarrier &carrier) {
   carrier.display.fillScreen(ST77XX_BLACK);
 }
 
-void testOLEDScreen(MKRIoTCarrier &carrier) {
-  // Vis velkomsttekst - centreret
+bool testOLEDScreen(MKRIoTCarrier &carrier) {
   carrier.display.setTextSize(2);
   carrier.display.setTextColor(ST77XX_WHITE);
-  
-  // Beregn centrering for "OLED Test" (cirka 10 pixels per tegn med tekststørrelse 2)
-  int textWidth = 9 * 10; // "OLED Test" er 9 tegn
+
+  int textWidth = 9 * 10;
   int xPosition = (240 - textWidth) / 2;
-  
   carrier.display.setCursor(xPosition, 30);
   carrier.display.println("OLED Test");
-  
-  // Beregn centrering for "Arduino Opla" (12 tegn)
+
   textWidth = 12 * 10;
   xPosition = (240 - textWidth) / 2;
-  
   carrier.display.setCursor(xPosition, 70);
   carrier.display.println("Arduino Opla");
   delay(2000);
-  
-  // Test forskellige farver
+
   testFarver(carrier);
-  
-  // Test tekststørrelser
   testTekstStorrelse(carrier);
-  
-  // Test cirkler og grafik
   drawCircleTest(carrier);
   drawGraphicsTest(carrier);
-  
-  // Afsluttende besked
-  carrier.display.fillScreen(ST77XX_BLACK);
-  carrier.display.setTextSize(2);
-  carrier.display.setTextColor(ST77XX_GREEN);
-  
-  // Centrér "Test Fuldfort!"
-  textWidth = 14 * 10; // "Test Fuldfort!" er ca. 14 tegn
-  xPosition = (240 - textWidth) / 2;
-  
-  carrier.display.setCursor(xPosition, 100);
-  carrier.display.println("Test Fuldfort!");
-  delay(2000);
+
+  showTestResult(carrier, "OLED", true);
+  return true;
 }
 
 void testFarver(MKRIoTCarrier &carrier) {

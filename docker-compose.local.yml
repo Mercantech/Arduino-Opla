@@ -1,0 +1,12 @@
+# Lokal udvikling uden dokploy-network:
+# docker compose -f docker-compose.yml -f docker-compose.local.yml up --build
+
+services:
+  web:
+    ports:
+      - "3000:3000"
+
+networks:
+  default:
+    name: opla-local
+    external: false
