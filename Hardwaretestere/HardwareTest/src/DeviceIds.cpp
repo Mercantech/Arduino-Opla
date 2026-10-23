@@ -2,8 +2,15 @@
 #include <WiFiNINA.h>
 #include <ArduinoECCX08.h>
 
+char g_samdId[40] = {0};
+char g_macStr[18] = {0};
+char g_eccSerial[32] = {0};
+bool g_eccOk = false;
+
+int g_testsPassed = 0;
+int g_testsFailed = 0;
+
 static void printSamdIdHex(char *out, size_t outLen) {
-  // SAMD21 unique ID: 128-bit at 0x0080A00C
   volatile uint32_t *id = (volatile uint32_t *)0x0080A00C;
   snprintf(out, outLen, "%08lX%08lX%08lX%08lX",
            (unsigned long)id[0], (unsigned long)id[1],
@@ -11,32 +18,30 @@ static void printSamdIdHex(char *out, size_t outLen) {
 }
 
 void printDeviceIds(MKRIoTCarrier &carrier) {
-  char samdId[40];
-  printSamdIdHex(samdId, sizeof(samdId));
+  printSamdIdHex(g_samdId, sizeof(g_samdId));
 
   byte mac[6];
   WiFi.macAddress(mac);
-  char macStr[18];
-  snprintf(macStr, sizeof(macStr), "%02X:%02X:%02X:%02X:%02X:%02X",
+  snprintf(g_macStr, sizeof(g_macStr), "%02X:%02X:%02X:%02X:%02X:%02X",
            mac[5], mac[4], mac[3], mac[2], mac[1], mac[0]);
 
-  char eccSerial[32] = "-";
-  bool eccOk = false;
+  g_eccOk = false;
+  strncpy(g_eccSerial, "-", sizeof(g_eccSerial) - 1);
   if (ECCX08.begin()) {
     String sn = ECCX08.serialNumber();
     if (sn.length() > 0) {
-      sn.toCharArray(eccSerial, sizeof(eccSerial));
-      eccOk = true;
+      sn.toCharArray(g_eccSerial, sizeof(g_eccSerial));
+      g_eccOk = true;
     }
   }
 
   Serial.println(F("=== Enheds-ID'er ==="));
   Serial.print(F("SAMD chip ID: "));
-  Serial.println(samdId);
+  Serial.println(g_samdId);
   Serial.print(F("WiFi MAC:     "));
-  Serial.println(macStr);
+  Serial.println(g_macStr);
   Serial.print(F("ECCX08 SN:    "));
-  Serial.println(eccOk ? eccSerial : "(ikke fundet)");
+  Serial.println(g_eccOk ? g_eccSerial : "(ikke fundet)");
   Serial.println(F("===================="));
 
   carrier.display.fillScreen(ST77XX_BLACK);
@@ -50,17 +55,17 @@ void printDeviceIds(MKRIoTCarrier &carrier) {
   carrier.display.setCursor(10, 50);
   carrier.display.println(F("SAMD:"));
   carrier.display.setCursor(10, 65);
-  carrier.display.println(samdId);
+  carrier.display.println(g_samdId);
 
   carrier.display.setCursor(10, 95);
   carrier.display.println(F("WiFi MAC:"));
   carrier.display.setCursor(10, 110);
-  carrier.display.println(macStr);
+  carrier.display.println(g_macStr);
 
   carrier.display.setCursor(10, 140);
   carrier.display.println(F("ECCX08:"));
   carrier.display.setCursor(10, 155);
-  carrier.display.println(eccOk ? eccSerial : "(ikke fundet)");
+  carrier.display.println(g_eccOk ? g_eccSerial : "(ikke fundet)");
 
   delay(4000);
 }

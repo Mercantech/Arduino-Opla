@@ -33,6 +33,9 @@ void runAllTests(MKRIoTCarrier &carrier) {
   Serial.println(F("Buzzer: SPRUNGET OVER"));
 #endif
 
+  g_testsPassed = passed;
+  g_testsFailed = failed;
+
   Serial.println(F("=== Test-opsummering ==="));
   Serial.print(F("Bestået: "));
   Serial.println(passed);
@@ -77,4 +80,7 @@ void runAllTests(MKRIoTCarrier &carrier) {
       delay(250);
     }
   }
+
+  // Registrér/opdatér enhed på API (unik via SAMD-ID)
+  reportToApi(carrier);
 }

@@ -5,14 +5,35 @@
 
 // Stille lokale: sæt til false — springer buzzer-test over og undgår bip ved knapper/gesture
 #ifndef ENABLE_SOUND_TEST
-#define ENABLE_SOUND_TEST true
+#define ENABLE_SOUND_TEST false
 #endif
+
+// Send resultat til opla.mercantec.tech efter tests (kræver WiFi i Secrets.h)
+#ifndef ENABLE_API_REPORT
+#define ENABLE_API_REPORT true
+#endif
+
+#define API_HOST "opla.mercantec.tech"
+#define API_PORT 443
+
+// Globale enheds-ID'er (udfyldes af printDeviceIds)
+extern char g_samdId[40];
+extern char g_macStr[18];
+extern char g_eccSerial[32];
+extern bool g_eccOk;
+
+// Test-opsummering (udfyldes af runAllTests)
+extern int g_testsPassed;
+extern int g_testsFailed;
 
 // Enheds-ID'er
 void printDeviceIds(MKRIoTCarrier &carrier);
 
 // Bip kun hvis ENABLE_SOUND_TEST er true
 void maybeBeep(MKRIoTCarrier &carrier);
+
+// Registrér/opdatér enhed + testrapport via HTTPS
+bool reportToApi(MKRIoTCarrier &carrier);
 
 // OLED
 void initOLEDScreen(MKRIoTCarrier &carrier);

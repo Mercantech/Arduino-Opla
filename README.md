@@ -13,6 +13,16 @@ pio device monitor
 
 Tester OLED, sensorer (temp/fugt, tryk, IMU accel+gyro, RGB/proximity/gesture), SD, relæ, knapper, LED, buzzer — og udskriver SAMD chip-ID, WiFi MAC og ECCX08-serienummer.
 
+Efter tests registrerer/opdaterer boardet sig selv på API’et (`POST /api/devices` på SAMD-ID) og gemmer testrapporten.
+
+```bash
+cd Hardwaretestere/HardwareTest
+cp src/Secrets.h.example src/Secrets.h
+# Udfyld WIFI_SSID og WIFI_PASSWORD
+```
+
+Lyd: `ENABLE_SOUND_TEST` i `src/Hardwaretestere.h`. API-upload: `ENABLE_API_REPORT`.
+
 ## Web API (opla.mercantec.tech)
 
 Hurtig FastAPI + Postgres + Nginx:
