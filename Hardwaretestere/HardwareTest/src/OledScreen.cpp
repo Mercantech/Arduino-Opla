@@ -16,6 +16,7 @@ bool testOLEDScreen(MKRIoTCarrier &carrier) {
   drawCircleTest(carrier);
   drawGraphicsTest(carrier);
 
+  setTestNote("colors+graphics");
   showTestResult(carrier, "OLED", true);
   return true;
 }

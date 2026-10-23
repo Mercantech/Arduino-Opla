@@ -3,146 +3,17 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Arduino Opla</title>
-  <style>
-    :root {
-      --bg: #0b1c1e;
-      --fg: #ecf1f1;
-      --accent: #008184;
-      --muted: #aeb8b8;
-      --ok: #16a588;
-      --bad: #e6195e;
-      --panel: #143033;
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      font-family: "Segoe UI", system-ui, sans-serif;
-      background: radial-gradient(ellipse at top, #143033 0%, var(--bg) 55%);
-      color: var(--fg);
-      min-height: 100vh;
-      padding: 2rem 1.25rem 3rem;
-    }
-    h1 { font-size: clamp(1.8rem, 4vw, 2.6rem); margin: 0 0 0.35rem; letter-spacing: -0.02em; }
-    p.lead { color: var(--muted); margin: 0 0 1.5rem; }
-    .status { display: inline-flex; gap: 0.5rem; align-items: center; margin-bottom: 1.5rem; }
-    .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); }
-    .dot.ok { background: var(--ok); }
-    .dot.bad { background: var(--bad); }
-    table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
-    th, td { text-align: left; padding: 0.65rem 0.5rem; border-bottom: 1px solid #2c353a; vertical-align: top; }
-    th { color: var(--muted); font-weight: 600; }
-    code { font-family: ui-monospace, monospace; font-size: 0.85em; word-break: break-all; }
-    .badge {
-      display: inline-block;
-      padding: 0.15rem 0.45rem;
-      border-radius: 4px;
-      font-size: 0.8rem;
-      font-weight: 600;
-    }
-    .badge.ok { background: rgba(22,165,136,.2); color: var(--ok); }
-    .badge.bad { background: rgba(230,25,94,.2); color: var(--bad); }
-    .history {
-      margin-top: 0.5rem;
-      padding: 0.5rem 0.65rem;
-      background: rgba(0,0,0,.25);
-      border-left: 3px solid var(--accent);
-      font-size: 0.85rem;
-      max-height: 220px;
-      overflow-y: auto;
-    }
-    .history li { margin: 0.25rem 0; color: var(--muted); }
-    .history time { color: var(--fg); }
-    .count { color: var(--muted); font-size: 0.85rem; }
-    button.linkish {
-      background: none; border: none; color: var(--accent); cursor: pointer;
-      padding: 0; font: inherit; text-decoration: underline;
-    }
-  </style>
+  <title>Opla — Arduino hardware-test</title>
+  <meta name="description" content="Opla enhedsregistrering og testhistorik for Arduino MKR IoT Carrier" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Source+Sans+3:wght@400;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
-  <h1>Arduino Opla</h1>
-  <p class="lead">Enheder upsert’es på SAMD-ID. Hver testkørsel tilføjes til historikken.</p>
-  <div class="status">
-    <span class="dot" id="dot"></span>
-    <span id="health">Tjekker API…</span>
+  <div class="shell">
+    <div id="app" aria-live="polite">Henter…</div>
   </div>
-  <table>
-    <thead>
-      <tr>
-        <th>ID (SAMD)</th>
-        <th>MAC / ECC</th>
-        <th>Label</th>
-        <th>Testhistorik</th>
-      </tr>
-    </thead>
-    <tbody id="rows">
-      <tr><td colspan="4">Henter enheder…</td></tr>
-    </tbody>
-  </table>
-  <script>
-    function fmtWhen(iso) {
-      try {
-        return new Date(iso).toLocaleString("da-DK");
-      } catch {
-        return iso;
-      }
-    }
-
-    function renderHistory(tests) {
-      const sorted = (tests || []).slice().sort(
-        (a, b) => new Date(b.created_at) - new Date(a.created_at)
-      );
-      if (!sorted.length) return "<span class='count'>Ingen tests endnu</span>";
-      const items = sorted.map(t => {
-        const badge = t.passed
-          ? "<span class='badge ok'>OK</span>"
-          : "<span class='badge bad'>FEJL</span>";
-        const score = `${t.passed_count} ok / ${t.failed_count} fejl`;
-        const det = t.details ? ` — ${t.details}` : "";
-        return `<li>${badge} <time>${fmtWhen(t.created_at)}</time> · ${score}${det}</li>`;
-      }).join("");
-      return `<div class="count">${sorted.length} kørsel(er)</div><ul class="history">${items}</ul>`;
-    }
-
-    async function load() {
-      const dot = document.getElementById("dot");
-      const healthEl = document.getElementById("health");
-      const rows = document.getElementById("rows");
-      try {
-        const h = await fetch("/api/health");
-        if (!h.ok) throw new Error("health " + h.status);
-        dot.className = "dot ok";
-        healthEl.textContent = "API online";
-      } catch (e) {
-        dot.className = "dot bad";
-        healthEl.textContent = "API ikke tilgængelig";
-      }
-      try {
-        const res = await fetch("/api/devices");
-        const devices = await res.json();
-        if (!devices.length) {
-          rows.innerHTML = "<tr><td colspan='4'>Ingen enheder endnu</td></tr>";
-          return;
-        }
-        rows.innerHTML = devices.map(d => {
-          const id = d.id || d.samd_id;
-          return `<tr>
-            <td><code>${id}</code></td>
-            <td>
-              <div><code>${d.mac || "—"}</code></div>
-              <div><code>${d.ecc_serial || "—"}</code></div>
-            </td>
-            <td>${d.label || "—"}</td>
-            <td>${renderHistory(d.tests)}</td>
-          </tr>`;
-        }).join("");
-      } catch (e) {
-        rows.innerHTML = "<tr><td colspan='4'>Kunne ikke hente enheder</td></tr>";
-      }
-    }
-    load();
-    setInterval(load, 15000);
-  </script>
+  <script src="/app.js" defer></script>
 </body>
 </html>

@@ -160,11 +160,36 @@ bool reportToApi(MKRIoTCarrier &carrier) {
   char testPath[96];
   snprintf(testPath, sizeof(testPath), "/api/devices/%s/tests", g_samdId);
 
-  char testJson[192];
-  snprintf(testJson, sizeof(testJson),
-           "{\"passed\":%s,\"passed_count\":%d,\"failed_count\":%d,\"details\":\"sound=%d\"}",
-           allOk ? "true" : "false", g_testsPassed, g_testsFailed,
-           ENABLE_SOUND_TEST ? 1 : 0);
+  // Fuld testrapport som JSON (gemmes i API details/report)
+  static char testJson[1600];
+  int pos = 0;
+  pos += snprintf(testJson + pos, sizeof(testJson) - pos,
+                  "{\"passed\":%s,\"passed_count\":%d,\"failed_count\":%d,\"report\":{",
+                  allOk ? "true" : "false", g_testsPassed, g_testsFailed);
+  pos += snprintf(testJson + pos, sizeof(testJson) - pos,
+                  "\"firmware\":\"HardwareTest\",\"sound_enabled\":%s,"
+                  "\"samd_id\":\"%s\",\"mac\":\"%s\",\"ecc_serial\":\"%s\","
+                  "\"wifi_ssid\":\"%s\",\"tests\":[",
+                  ENABLE_SOUND_TEST ? "true" : "false",
+                  g_samdId, g_macStr, g_eccOk ? g_eccSerial : "",
+                  WIFI_SSID);
+
+  for (int i = 0; i < g_testLogCount && pos < (int)sizeof(testJson) - 80; i++) {
+    if (i > 0) {
+      testJson[pos++] = ',';
+    }
+    pos += snprintf(testJson + pos, sizeof(testJson) - pos,
+                    "{\"name\":\"%s\",\"ok\":%s,\"skipped\":%s,\"note\":\"%s\"}",
+                    g_testLog[i].name,
+                    g_testLog[i].ok ? "true" : "false",
+                    g_testLog[i].skipped ? "true" : "false",
+                    g_testLog[i].note);
+  }
+  pos += snprintf(testJson + pos, sizeof(testJson) - pos, "]}}");
+
+  Serial.print(F("API: rapport "));
+  Serial.print(pos);
+  Serial.println(F(" bytes"));
 
   String testResp = httpRequest("POST", testPath, testJson);
   if (testResp.length() == 0) {

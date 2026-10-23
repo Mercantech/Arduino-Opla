@@ -36,6 +36,8 @@ bool testHumidityTemperature(MKRIoTCarrier &carrier) {
     delay(1000);
   }
 
+  snprintf(line, sizeof(line), "temp_c=%.2f humidity=%.1f", temperature, humidity);
+  setTestNote(line);
   showTestResult(carrier, "Temp/Fugt", ok);
   return ok;
 }
@@ -69,6 +71,8 @@ bool testPressureSensor(MKRIoTCarrier &carrier) {
     delay(1000);
   }
 
+  snprintf(line, sizeof(line), "pressure_kpa=%.2f", pressure);
+  setTestNote(line);
   showTestResult(carrier, "Tryk", ok);
   return ok;
 }
@@ -121,6 +125,8 @@ bool testIMU(MKRIoTCarrier &carrier) {
   }
 
   bool ok = accelOk && gyroOk;
+  snprintf(line, sizeof(line), "accel=%.2f,%.2f,%.2f gyro=%.1f,%.1f,%.1f", ax, ay, az, gx, gy, gz);
+  setTestNote(line);
   showTestResult(carrier, "IMU", ok);
   return ok;
 }
@@ -200,6 +206,8 @@ bool testRGBGestureSensor(MKRIoTCarrier &carrier) {
   }
 
   bool ok = colorOk && proxOk;
+  snprintf(line, sizeof(line), "rgb=%d,%d,%d prox=%d gestures=%d/4", r, g, b, proximity, detectedGestures);
+  setTestNote(line);
   showTestResult(carrier, "RGB/Prox", ok);
   return ok;
 }
@@ -232,8 +240,10 @@ bool testSDCard(MKRIoTCarrier &carrier) {
 
   if (!ok) {
     Serial.println(F("SD: ingen kort eller I/O-fejl"));
+    setTestNote("rw=fail");
   } else {
     Serial.println(F("SD: skriv/laes OK"));
+    setTestNote("rw=ok");
   }
 
   showTestResult(carrier, "SD Kort", ok);

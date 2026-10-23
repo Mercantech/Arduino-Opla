@@ -26,6 +26,22 @@ extern bool g_eccOk;
 extern int g_testsPassed;
 extern int g_testsFailed;
 
+// Detaljeret testlog til API-historik
+#define MAX_TEST_LOG 12
+struct TestLogEntry {
+  char name[20];
+  bool ok;
+  bool skipped;
+  char note[64]; // frie detaljer / sensorværdier
+};
+extern TestLogEntry g_testLog[MAX_TEST_LOG];
+extern int g_testLogCount;
+
+void resetTestLog();
+void recordTest(const char *name, bool ok, const char *note = "", bool skipped = false);
+void setTestNote(const char *note);
+extern char g_lastNote[64];
+
 // Enheds-ID'er
 void printDeviceIds(MKRIoTCarrier &carrier);
 

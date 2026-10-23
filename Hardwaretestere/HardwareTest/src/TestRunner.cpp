@@ -1,6 +1,10 @@
 #include "Hardwaretestere.h"
 
-static void track(bool ok, int &passed, int &failed) {
+static void track(const char *name, bool ok, int &passed, int &failed, bool skipped = false) {
+  recordTest(name, ok, g_lastNote, skipped);
+  if (skipped) {
+    return;
+  }
   if (ok) {
     passed++;
   } else {
@@ -13,24 +17,28 @@ void runAllTests(MKRIoTCarrier &carrier) {
   int failed = 0;
   char line[24];
 
+  resetTestLog();
+
 #if ENABLE_SOUND_TEST
   Serial.println(F("Lyd: TIL (buzzer + bip)"));
 #else
   Serial.println(F("Lyd: FRA (stille lokale — buzzer sprunget over)"));
 #endif
 
-  track(testOLEDScreen(carrier), passed, failed);
-  track(testHumidityTemperature(carrier), passed, failed);
-  track(testPressureSensor(carrier), passed, failed);
-  track(testIMU(carrier), passed, failed);
-  track(testRGBGestureSensor(carrier), passed, failed);
-  track(testSDCard(carrier), passed, failed);
-  track(testRelays(carrier), passed, failed);
-  track(testButtons(carrier), passed, failed);
-  track(testLEDs(carrier), passed, failed);
+  track("OLED", testOLEDScreen(carrier), passed, failed);
+  track("Temp/Fugt", testHumidityTemperature(carrier), passed, failed);
+  track("Tryk", testPressureSensor(carrier), passed, failed);
+  track("IMU", testIMU(carrier), passed, failed);
+  track("RGB/Prox", testRGBGestureSensor(carrier), passed, failed);
+  track("SD", testSDCard(carrier), passed, failed);
+  track("Relay", testRelays(carrier), passed, failed);
+  track("Knapper", testButtons(carrier), passed, failed);
+  track("LED", testLEDs(carrier), passed, failed);
 #if ENABLE_SOUND_TEST
-  track(testBuzzer(carrier), passed, failed);
+  track("Buzzer", testBuzzer(carrier), passed, failed);
 #else
+  setTestNote("disabled_quiet_room");
+  track("Buzzer", true, passed, failed, true);
   Serial.println(F("Buzzer: SPRUNGET OVER"));
 #endif
 
@@ -42,6 +50,22 @@ void runAllTests(MKRIoTCarrier &carrier) {
   Serial.println(passed);
   Serial.print(F("Fejlet:  "));
   Serial.println(failed);
+  for (int i = 0; i < g_testLogCount; i++) {
+    Serial.print(F("  - "));
+    Serial.print(g_testLog[i].name);
+    Serial.print(F(": "));
+    if (g_testLog[i].skipped) {
+      Serial.print(F("SKIP"));
+    } else {
+      Serial.print(g_testLog[i].ok ? F("OK") : F("FAIL"));
+    }
+    if (g_testLog[i].note[0]) {
+      Serial.print(F(" ("));
+      Serial.print(g_testLog[i].note);
+      Serial.print(')');
+    }
+    Serial.println();
+  }
 
   clearDisplay(carrier);
   if (failed == 0) {

@@ -96,36 +96,74 @@ def get_device(samd_id: str, db: Session = Depends(get_db)):
 @app.get("/api/devices/{samd_id}/tests", response_model=list[schemas.TestReportOut])
 def list_tests(samd_id: str, db: Session = Depends(get_db)):
     """Fuld testhistorik for enheden (nyeste først)."""
-    device = db.query(models.Device).filter(models.Device.samd_id == samd_id).first()
+    device = (
+        db.query(models.Device)
+        .options(joinedload(models.Device.tests))
+        .filter(models.Device.samd_id == samd_id)
+        .first()
+    )
     if device is None:
         raise HTTPException(status_code=404, detail="Device not found")
-    return (
-        db.query(models.TestReport)
-        .filter(models.TestReport.samd_id == samd_id)
-        .order_by(models.TestReport.created_at.desc())
-        .all()
-    )
+    return schemas.DeviceOut.from_device(device).tests
 
 
 @app.post("/api/devices/{samd_id}/tests", response_model=schemas.TestReportOut)
 def add_test(samd_id: str, body: schemas.TestReportIn, db: Session = Depends(get_db)):
     """Tilføj ny testrapport — sletter aldrig gamle (fuld historik)."""
+    import json
+    from datetime import datetime, timezone
+
     device = db.query(models.Device).filter(models.Device.samd_id == samd_id).first()
     if device is None:
         raise HTTPException(status_code=404, detail="Device not found")
 
-    report = models.TestReport(
+    details = body.details
+    if body.report is not None:
+        details = json.dumps(
+            {
+                "passed": body.passed,
+                "passed_count": body.passed_count,
+                "failed_count": body.failed_count,
+                "report": body.report,
+            },
+            ensure_ascii=False,
+        )
+    elif details is None and body.report is None:
+        # Hele body kan være flat JSON fra firmware (report nested i POST)
+        details = None
+
+    # Firmware sender {"passed",...,"report":{...}} — gem hele payload hvis details mangler
+    if details is None:
+        details = json.dumps(body.model_dump(exclude_none=True), ensure_ascii=False)
+
+    row = models.TestReport(
         samd_id=samd_id,
         passed=body.passed,
         passed_count=body.passed_count,
         failed_count=body.failed_count,
-        details=body.details,
+        details=details,
     )
-    db.add(report)
-    # Touch enhed så den sorterer øverst ved ny test (metadata opdateres ikke slettet)
-    from datetime import datetime, timezone
-
+    db.add(row)
     device.updated_at = datetime.now(timezone.utc)
     db.commit()
-    db.refresh(report)
-    return report
+    db.refresh(row)
+
+    parsed_report = body.report
+    if parsed_report is None and details:
+        try:
+            blob = json.loads(details)
+            if isinstance(blob, dict):
+                parsed_report = blob.get("report", blob)
+        except json.JSONDecodeError:
+            parsed_report = None
+
+    return schemas.TestReportOut(
+        id=row.id,
+        samd_id=row.samd_id,
+        passed=row.passed,
+        passed_count=row.passed_count,
+        failed_count=row.failed_count,
+        details=row.details,
+        report=parsed_report,
+        created_at=row.created_at,
+    )

@@ -25,6 +25,7 @@ bool testRelays(MKRIoTCarrier &carrier) {
   carrier.Relay1.close();
   carrier.Relay2.close();
 
+  setTestNote("relay1+2_cycled");
   showTestResult(carrier, "Relay", true);
   return true;
 }
@@ -65,6 +66,13 @@ bool testButtons(MKRIoTCarrier &carrier) {
     delay(10);
   }
 
+  int n = 0;
+  for (int i = 0; i < 5; i++) {
+    if (buttonPressed[i]) n++;
+  }
+  char note[24];
+  snprintf(note, sizeof(note), "touched=%d/5", n);
+  setTestNote(note);
   showTestResult(carrier, "Knapper", allButtonsPressed);
   return allButtonsPressed;
 }
@@ -112,6 +120,7 @@ bool testLEDs(MKRIoTCarrier &carrier) {
   carrier.leds.clear();
   carrier.leds.show();
 
+  setTestNote("pixels=5 rgb_cycle");
   showTestResult(carrier, "LED", true);
   return true;
 }
@@ -144,6 +153,7 @@ bool testBuzzer(MKRIoTCarrier &carrier) {
     delay(300);
   }
 
+  setTestNote("scale+beep");
   showTestResult(carrier, "Buzzer", true);
   return true;
 #endif
