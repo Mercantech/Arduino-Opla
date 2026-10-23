@@ -174,7 +174,7 @@ function renderDevice() {
       <div class="section-head">
         <div>
           <h2>Testhistorik</h2>
-          <p>Nyeste foerst · klik for fulde detaljer</p>
+          <p>Klik en koersel for sensornoter og delresultater.</p>
         </div>
       </div>
       <div class="timeline" id="timeline"></div>
