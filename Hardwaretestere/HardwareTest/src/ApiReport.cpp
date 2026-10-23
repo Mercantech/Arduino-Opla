@@ -40,10 +40,63 @@ static bool wifiConnect() {
 
   Serial.print(F("API: WiFi OK, IP="));
   Serial.println(WiFi.localIP());
+  Serial.print(F("API: NINA firmware="));
+  Serial.println(WiFi.firmwareVersion());
   return true;
 }
 
+static void printSslDiag(WiFiSSLClient &client) {
+  Serial.println(F("API: TLS/connect fejlede"));
+  Serial.println(F("  1) Serial: se NINA firmware ovenfor (helst 1.5.0+)"));
+  Serial.println(F("  2) Arduino IDE: Tools > Firmware Updater (NINA)"));
+  Serial.println(F("  3) Tools > Upload SSL Root Certificates"));
+  Serial.println(F("     tilfoej: opla.mercantec.tech:443"));
+  Serial.println(F("  4) Test om SSL generelt virker (google.com)"));
+#if defined(WIFI_FIRMWARE_LATEST_VERSION) || 1
+  // WiFiNINA 2.x: BearSSL fejl-kode (0 hvis ikke understottet)
+  Serial.print(F("  BearSSL errorCode="));
+  Serial.println(client.errorCodeBearSSL());
+#endif
+}
+
+static bool sslProbe(const char *host, uint16_t port) {
+  WiFiSSLClient probe;
+  probe.setTimeout(12000);
+  Serial.print(F("API: SSL-probe "));
+  Serial.print(host);
+  Serial.print(':');
+  Serial.print(port);
+  Serial.print(F(" ... "));
+  bool ok = probe.connect(host, port);
+  if (ok) {
+    Serial.println(F("OK"));
+    probe.stop();
+  } else {
+    Serial.println(F("FEJL"));
+#if 1
+    Serial.print(F("  BearSSL errorCode="));
+    Serial.println(probe.errorCodeBearSSL());
+#endif
+  }
+  return ok;
+}
+
 static String httpRequest(const char *method, const char *path, const char *jsonBody) {
+  // DNS-check
+  IPAddress resolved;
+  Serial.print(F("API: DNS "));
+  Serial.print(API_HOST);
+  Serial.print(F(" -> "));
+  if (WiFi.hostByName(API_HOST, resolved)) {
+    Serial.println(resolved);
+  } else {
+    Serial.println(F("FEJL (DNS)"));
+  }
+
+  // Sammenlign: virker TLS overhovedet?
+  sslProbe("www.google.com", 443);
+  sslProbe(API_HOST, API_PORT);
+
   WiFiSSLClient client;
   client.setTimeout(20000);
 
@@ -53,7 +106,7 @@ static String httpRequest(const char *method, const char *path, const char *json
   Serial.println(path);
 
   if (!client.connect(API_HOST, API_PORT)) {
-    Serial.println(F("API: TLS/connect fejlede (tjek NINA-firmware / cert)"));
+    printSslDiag(client);
     return "";
   }
 
