@@ -475,28 +475,41 @@ class ArduinoStarterApp(ctk.CTk):
         return project, env, port
 
     def _ensure_secrets_before_upload(self, project: str) -> bool:
+        from secrets_editor import find_secrets_example, migrate_secrets_to_schema
+
         path = find_secrets_path(project)
+        example = find_secrets_example(project)
+        # Projekter uden secrets-fil/example (rent offline) — tillad upload
+        if path is None and example is None:
+            return True
         if path is None:
             if messagebox.askyesno(
                 APP_TITLE,
-                "Secrets.h mangler.\nOpret fra example / redigér WiFi nu?",
+                "Secrets-fil mangler (secrets.h / Secrets.h).\n"
+                "Opret fra .example og redigér nu?",
             ):
                 ensure_secrets_file(project)
                 open_secrets_dialog(self, project)
                 path = find_secrets_path(project)
             if path is None:
-                messagebox.showerror(APP_TITLE, "Upload blokeret — Secrets.h mangler.")
+                messagebox.showerror(APP_TITLE, "Upload blokeret — secrets-fil mangler.")
                 return False
-        if not secrets_looks_valid(path):
-            self._log(f"ADVARSEL: Secrets.h ser ufuldstændig ud ({path})")
+        if migrate_secrets_to_schema(project):
+            path = find_secrets_path(project)
+            self._log(f"Secrets migreret til projektets .example-skema ({path})")
+        if path is None or not secrets_looks_valid(path, project):
+            self._log(f"ADVARSEL: secrets ser ufuldstændig ud ({path})")
             if messagebox.askyesno(
                 APP_TITLE,
-                "WIFI_SSID ser tom eller som placeholder.\nRedigér Secrets.h før upload?",
+                "SSID mangler eller er placeholder "
+                "(fx DIT_WIFI / SECRET_SSID).\n\nRedigér secrets før upload?",
             ):
                 open_secrets_dialog(self, project)
                 path = find_secrets_path(project)
-                if path is None or not secrets_looks_valid(path):
-                    messagebox.showerror(APP_TITLE, "Upload blokeret — udfyld WIFI_SSID.")
+                if path is None or not secrets_looks_valid(path, project):
+                    messagebox.showerror(
+                        APP_TITLE, "Upload blokeret — udfyld SSID (og øvrige secrets)."
+                    )
                     return False
         return True
 

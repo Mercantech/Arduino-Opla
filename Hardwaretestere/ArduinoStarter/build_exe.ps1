@@ -61,6 +61,17 @@ if (-not (Test-Path $exe)) {
   if (Test-Path $alt) { $exe = $alt }
 }
 
+# Zip til release/ (committes — README linker hertil)
+$releaseDir = Join-Path $Root "release"
+New-Item -ItemType Directory -Force -Path $releaseDir | Out-Null
+$zip = Join-Path $releaseDir "ArduinoStarter-win64.zip"
+if (Test-Path $zip) { Remove-Item $zip -Force }
+$folder = Join-Path $dist "ArduinoStarter"
+if (Test-Path $folder) {
+  Compress-Archive -Path (Join-Path $folder "*") -DestinationPath $zip -CompressionLevel Optimal
+  Write-Host "Release-zip: $zip" -ForegroundColor Cyan
+}
+
 Write-Host ""
 Write-Host "Faerdig: $exe" -ForegroundColor Green
 Write-Host "Elever kan dobbeltklikke exe. PlatformIO skal stadig vaere installeret."
