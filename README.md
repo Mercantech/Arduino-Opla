@@ -2,6 +2,16 @@
 
 Kodeeksempler og hardware-tester til Arduino Oplà (MKR WiFi 1010 + MKR IoT Carrier).
 
+## Arduino Starter (Upload & Monitor)
+
+Desktop-app (Python) der efterligner PlatformIO **Upload and Monitor** — vælg et hvilket som helst PIO-projekt:
+
+```powershell
+cd Hardwaretestere/ArduinoStarter
+python -m pip install -r requirements.txt
+python app.py
+```
+
 ## HardwareTest (PlatformIO)
 
 ```bash
