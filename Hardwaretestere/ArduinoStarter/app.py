@@ -3,36 +3,49 @@ from __future__ import annotations
 
 import json
 import threading
+import time
 import tkinter as tk
+from datetime import datetime
 from pathlib import Path
 from tkinter import filedialog, messagebox
 
 import customtkinter as ctk
 
-from pio_runner import find_pio, parse_platformio_ini, run_upload
-from serial_monitor import SerialMonitor, list_ports, wait_for_app_port
+from pio_runner import find_pio, parse_platformio_ini, run_pio, run_powershell, run_upload
+from secrets_editor import (
+    ensure_secrets_file,
+    find_secrets_path,
+    open_secrets_dialog,
+    secrets_looks_valid,
+)
+from serial_monitor import (
+    SerialMonitor,
+    list_ports,
+    pick_best_port,
+    wait_for_app_port,
+)
 
 APP_TITLE = "Arduino Starter — Upload & Monitor"
 SETTINGS_PATH = Path.home() / ".arduino_starter.json"
-DEFAULT_PROJECT = (
-    Path(__file__).resolve().parent.parent / "HardwareTest"
-)
+DEFAULT_PROJECT = Path(__file__).resolve().parent.parent / "HardwareTest"
+UPDATE_DEVICE_PS1 = Path(__file__).resolve().parent.parent / "Update-Device.ps1"
 
 
 class ArduinoStarterApp(ctk.CTk):
     def __init__(self) -> None:
         super().__init__()
         self.title(APP_TITLE)
-        self.geometry("960x640")
-        self.minsize(720, 480)
+        self.geometry("1000x680")
+        self.minsize(780, 520)
 
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("blue")
 
         self._pio = find_pio()
-        self._envs: dict[str, int] = {}  # name -> baud
-        self._port_map: dict[str, str] = {}  # label -> device
+        self._envs: dict[str, int] = {}
+        self._port_map: dict[str, str] = {}
         self._busy = False
+        self._action_buttons: list[ctk.CTkButton] = []
         self._monitor = SerialMonitor(
             on_line=self._log_threadsafe,
             on_stopped=self._on_monitor_stopped,
@@ -40,11 +53,9 @@ class ArduinoStarterApp(ctk.CTk):
 
         self._build_ui()
         self._load_settings()
-        self.refresh_ports()
+        self.refresh_ports(auto_select=True)
         self._update_pio_status()
         self.protocol("WM_DELETE_WINDOW", self._on_close)
-
-    # --- UI ---
 
     def _build_ui(self) -> None:
         pad = {"padx": 10, "pady": 6}
@@ -52,16 +63,15 @@ class ArduinoStarterApp(ctk.CTk):
         top = ctk.CTkFrame(self)
         top.pack(fill="x", **pad)
 
-        # Project
         ctk.CTkLabel(top, text="Projekt").grid(row=0, column=0, sticky="w", padx=6, pady=4)
         self.project_var = tk.StringVar()
-        self.project_entry = ctk.CTkEntry(top, textvariable=self.project_var, width=520)
-        self.project_entry.grid(row=0, column=1, columnspan=2, sticky="ew", padx=6, pady=4)
+        ctk.CTkEntry(top, textvariable=self.project_var, width=520).grid(
+            row=0, column=1, columnspan=2, sticky="ew", padx=6, pady=4
+        )
         ctk.CTkButton(top, text="Browse…", width=100, command=self.browse_project).grid(
             row=0, column=3, padx=6, pady=4
         )
 
-        # Env + baud
         ctk.CTkLabel(top, text="Environment").grid(row=1, column=0, sticky="w", padx=6, pady=4)
         self.env_var = tk.StringVar()
         self.env_menu = ctk.CTkOptionMenu(
@@ -71,49 +81,96 @@ class ArduinoStarterApp(ctk.CTk):
 
         ctk.CTkLabel(top, text="Baud").grid(row=1, column=2, sticky="e", padx=6, pady=4)
         self.baud_var = tk.StringVar(value="9600")
-        self.baud_entry = ctk.CTkEntry(top, textvariable=self.baud_var, width=100)
-        self.baud_entry.grid(row=1, column=3, sticky="w", padx=6, pady=4)
+        ctk.CTkEntry(top, textvariable=self.baud_var, width=100).grid(
+            row=1, column=3, sticky="w", padx=6, pady=4
+        )
 
-        # Port
         ctk.CTkLabel(top, text="COM-port").grid(row=2, column=0, sticky="w", padx=6, pady=4)
         self.port_var = tk.StringVar()
-        self.port_menu = ctk.CTkOptionMenu(top, variable=self.port_var, values=["—"], width=420)
-        self.port_menu.grid(row=2, column=1, columnspan=2, sticky="ew", padx=6, pady=4)
-        ctk.CTkButton(top, text="Refresh", width=100, command=self.refresh_ports).grid(
-            row=2, column=3, padx=6, pady=4
+        self.port_menu = ctk.CTkOptionMenu(top, variable=self.port_var, values=["—"], width=360)
+        self.port_menu.grid(row=2, column=1, sticky="ew", padx=6, pady=4)
+
+        port_btns = ctk.CTkFrame(top, fg_color="transparent")
+        port_btns.grid(row=2, column=2, columnspan=2, sticky="e", padx=6, pady=4)
+        ctk.CTkButton(port_btns, text="Auto", width=70, command=self.auto_select_port).pack(
+            side="left", padx=3
+        )
+        ctk.CTkButton(port_btns, text="Refresh", width=80, command=lambda: self.refresh_ports()).pack(
+            side="left", padx=3
         )
 
         top.grid_columnconfigure(1, weight=1)
 
-        # Buttons
+        # Primary actions
         btns = ctk.CTkFrame(self)
         btns.pack(fill="x", **pad)
-        self.btn_upload = ctk.CTkButton(btns, text="Upload", command=self.do_upload, width=120)
-        self.btn_upload.pack(side="left", padx=6, pady=8)
-        self.btn_monitor = ctk.CTkButton(btns, text="Monitor", command=self.do_monitor, width=120)
-        self.btn_monitor.pack(side="left", padx=6, pady=8)
+        self.btn_upload = ctk.CTkButton(btns, text="Upload", command=self.do_upload, width=100)
+        self.btn_monitor = ctk.CTkButton(btns, text="Monitor", command=self.do_monitor, width=100)
         self.btn_both = ctk.CTkButton(
-            btns, text="Upload & Monitor", command=self.do_upload_and_monitor, width=160,
-            fg_color="#1f6aa5", hover_color="#144870",
+            btns,
+            text="Upload & Monitor",
+            command=self.do_upload_and_monitor,
+            width=150,
+            fg_color="#1f6aa5",
+            hover_color="#144870",
         )
-        self.btn_both.pack(side="left", padx=6, pady=8)
         self.btn_stop = ctk.CTkButton(
-            btns, text="Stop monitor", command=self.do_stop_monitor, width=120,
-            fg_color="#8B3A3A", hover_color="#6B2A2A",
+            btns,
+            text="Stop monitor",
+            command=self.do_stop_monitor,
+            width=110,
+            fg_color="#8B3A3A",
+            hover_color="#6B2A2A",
         )
-        self.btn_stop.pack(side="left", padx=6, pady=8)
-        ctk.CTkButton(btns, text="Clear", command=self.clear_log, width=80).pack(
-            side="right", padx=6, pady=8
+        for b in (self.btn_upload, self.btn_monitor, self.btn_both, self.btn_stop):
+            b.pack(side="left", padx=4, pady=8)
+
+        ctk.CTkButton(btns, text="Clear", command=self.clear_log, width=70).pack(
+            side="right", padx=4, pady=8
+        )
+        ctk.CTkButton(btns, text="Gem log", command=self.save_log, width=90).pack(
+            side="right", padx=4, pady=8
         )
 
-        # Log
+        # Tools row
+        tools = ctk.CTkFrame(self)
+        tools.pack(fill="x", **pad)
+        ctk.CTkLabel(tools, text="Værktøj").pack(side="left", padx=8)
+        self.btn_build = ctk.CTkButton(tools, text="Build", command=self.do_build, width=90)
+        self.btn_clean = ctk.CTkButton(tools, text="Clean", command=self.do_clean, width=90)
+        self.btn_rebuild = ctk.CTkButton(tools, text="Rebuild", command=self.do_rebuild, width=90)
+        self.btn_nina = ctk.CTkButton(
+            tools, text="NINA + SSL", command=self.do_nina_ssl, width=110
+        )
+        self.btn_secrets = ctk.CTkButton(
+            tools, text="Secrets…", command=self.do_secrets, width=100
+        )
+        for b in (
+            self.btn_build,
+            self.btn_clean,
+            self.btn_rebuild,
+            self.btn_nina,
+            self.btn_secrets,
+        ):
+            b.pack(side="left", padx=4, pady=6)
+
+        self._action_buttons = [
+            self.btn_upload,
+            self.btn_monitor,
+            self.btn_both,
+            self.btn_build,
+            self.btn_clean,
+            self.btn_rebuild,
+            self.btn_nina,
+        ]
+
         self.log = ctk.CTkTextbox(self, font=ctk.CTkFont(family="Consolas", size=13))
         self.log.pack(fill="both", expand=True, padx=10, pady=(0, 6))
 
-        # Status
         self.status_var = tk.StringVar(value="Klar")
-        self.status = ctk.CTkLabel(self, textvariable=self.status_var, anchor="w")
-        self.status.pack(fill="x", padx=12, pady=(0, 8))
+        ctk.CTkLabel(self, textvariable=self.status_var, anchor="w").pack(
+            fill="x", padx=12, pady=(0, 8)
+        )
 
         self.project_var.trace_add("write", lambda *_: self.after(400, self._reload_envs_debounced))
         self._env_reload_token = 0
@@ -165,15 +222,32 @@ class ArduinoStarterApp(ctk.CTk):
     def clear_log(self) -> None:
         self.log.delete("1.0", "end")
 
+    def save_log(self) -> None:
+        stamp = datetime.now().strftime("%Y%m%d-%H%M")
+        path = filedialog.asksaveasfilename(
+            title="Gem log",
+            defaultextension=".txt",
+            initialfile=f"arduino-starter-log-{stamp}.txt",
+            filetypes=[("Tekst", "*.txt"), ("Alle filer", "*.*")],
+        )
+        if not path:
+            return
+        try:
+            Path(path).write_text(self.log.get("1.0", "end"), encoding="utf-8")
+            self._log(f"Log gemt: {path}")
+            self.set_status("Log gemt")
+        except OSError as e:
+            messagebox.showerror(APP_TITLE, f"Kunne ikke gemme log: {e}")
+
     def _set_busy(self, busy: bool) -> None:
         self._busy = busy
         state = "disabled" if busy else "normal"
-        for btn in (self.btn_upload, self.btn_monitor, self.btn_both):
+        for btn in self._action_buttons:
             btn.configure(state=state)
 
     def _selected_port_device(self) -> str | None:
         label = self.port_var.get()
-        if not label or label == "—":
+        if not label or label in ("—", "Ingen porte"):
             return None
         return self._port_map.get(label, label.split(" — ")[0].strip())
 
@@ -183,7 +257,53 @@ class ArduinoStarterApp(ctk.CTk):
         except ValueError:
             return 9600
 
-    # --- project / env / ports ---
+    def _require_project_env(self, need_port: bool = False) -> tuple[str, str, str | None] | None:
+        project = self.project_var.get().strip()
+        env = self.env_var.get().strip()
+        port = self._selected_port_device()
+        if not project or not (Path(project) / "platformio.ini").is_file():
+            messagebox.showwarning(APP_TITLE, "Vælg en mappe med platformio.ini.")
+            return None
+        if not env or env == "—":
+            messagebox.showwarning(APP_TITLE, "Vælg et environment.")
+            return None
+        if need_port and not port:
+            messagebox.showwarning(APP_TITLE, "Vælg en COM-port.")
+            return None
+        if not self._pio:
+            self._pio = find_pio()
+        if not self._pio:
+            messagebox.showerror(APP_TITLE, "PlatformIO CLI ikke fundet.")
+            return None
+        return project, env, port
+
+    def _ensure_secrets_before_upload(self, project: str) -> bool:
+        path = find_secrets_path(project)
+        if path is None:
+            if messagebox.askyesno(
+                APP_TITLE,
+                "Secrets.h mangler.\nOpret fra example / redigér WiFi nu?",
+            ):
+                ensure_secrets_file(project)
+                open_secrets_dialog(self, project)
+                path = find_secrets_path(project)
+            if path is None:
+                messagebox.showerror(APP_TITLE, "Upload blokeret — Secrets.h mangler.")
+                return False
+        if not secrets_looks_valid(path):
+            self._log(f"ADVARSEL: Secrets.h ser ufuldstændig ud ({path})")
+            if messagebox.askyesno(
+                APP_TITLE,
+                "WIFI_SSID ser tom eller som placeholder.\nRedigér Secrets.h før upload?",
+            ):
+                open_secrets_dialog(self, project)
+                path = find_secrets_path(project)
+                if path is None or not secrets_looks_valid(path):
+                    messagebox.showerror(APP_TITLE, "Upload blokeret — udfyld WIFI_SSID.")
+                    return False
+        return True
+
+    # --- project / ports ---
 
     def browse_project(self) -> None:
         path = filedialog.askdirectory(
@@ -220,8 +340,7 @@ class ArduinoStarterApp(ctk.CTk):
         names = [e.name for e in envs]
         self._envs = {e.name: e.monitor_speed for e in envs}
         self.env_menu.configure(values=names)
-        current = self.env_var.get()
-        if current not in names:
+        if self.env_var.get() not in names:
             self.env_var.set(names[0])
         self._on_env_change(self.env_var.get())
 
@@ -229,7 +348,7 @@ class ArduinoStarterApp(ctk.CTk):
         if name in self._envs:
             self.baud_var.set(str(self._envs[name]))
 
-    def refresh_ports(self) -> None:
+    def refresh_ports(self, auto_select: bool = False) -> None:
         ports = list_ports()
         if not ports:
             self._port_map = {}
@@ -243,30 +362,45 @@ class ArduinoStarterApp(ctk.CTk):
             labels.append(p.label)
             self._port_map[p.label] = p.device
         self.port_menu.configure(values=labels)
-        # Behold tidligere valg hvis muligt
+
         chosen = None
-        if prev:
+        best = pick_best_port(ports)
+        if auto_select and best:
+            chosen = best.label
+            self._log(f"Auto-valgt {best.label}")
+        if not chosen and prev:
             for lab, dev in self._port_map.items():
                 if dev.upper() == prev.upper():
                     chosen = lab
                     break
+        if not chosen and best:
+            chosen = best.label
         if not chosen:
-            # Foretræk ikke-bootloader
-            for p in ports:
-                if not p.is_bootloader:
-                    chosen = p.label
-                    break
-            if not chosen:
-                chosen = labels[0]
+            chosen = labels[0]
         self.port_var.set(chosen)
         for p in ports:
             if p.is_bootloader:
                 self._log(f"Tip: {p.device} er i bootloader-mode")
 
+    def auto_select_port(self) -> None:
+        ports = list_ports()
+        self.refresh_ports(auto_select=False)
+        best = pick_best_port(ports)
+        if not best:
+            messagebox.showwarning(
+                APP_TITLE,
+                "Ingen Arduino/MKR-port fundet.\n"
+                "(Bluetooth-COM ignoreres — tilslut boardet og prøv igen.)",
+            )
+            return
+        self.port_var.set(best.label)
+        self._log(f"Auto-valgt {best.label}")
+        self.set_status(f"Port: {best.device}")
+
     # --- actions ---
 
     def do_upload(self) -> None:
-        self._start_job(upload=True, monitor=False)
+        self._start_upload_job(monitor=False)
 
     def do_monitor(self) -> None:
         if self._busy:
@@ -282,35 +416,122 @@ class ArduinoStarterApp(ctk.CTk):
             messagebox.showerror(APP_TITLE, str(e))
 
     def do_upload_and_monitor(self) -> None:
-        self._start_job(upload=True, monitor=True)
+        self._start_upload_job(monitor=True)
 
     def do_stop_monitor(self) -> None:
         self._monitor.stop()
         self.set_status("Monitor stoppet")
 
-    def _on_monitor_stopped(self) -> None:
-        self.after(0, lambda: self.set_status("Klar") if not self._busy else None)
+    def do_build(self) -> None:
+        self._start_pio_job(["build"], status="Bygger…")
 
-    def _start_job(self, upload: bool, monitor: bool) -> None:
+    def do_clean(self) -> None:
+        self._start_pio_job(["clean"], status="Clean…")
+
+    def do_rebuild(self) -> None:
+        self._start_pio_job(["clean", "build"], status="Rebuild…")
+
+    def do_secrets(self) -> None:
+        project = self.project_var.get().strip()
+        if not project or not Path(project).is_dir():
+            messagebox.showwarning(APP_TITLE, "Vælg et projekt først.")
+            return
+        if open_secrets_dialog(self, project):
+            self._log(f"Secrets.h gemt for {project}")
+            self.set_status("Secrets gemt")
+
+    def do_nina_ssl(self) -> None:
         if self._busy:
             return
-        project = self.project_var.get().strip()
-        env = self.env_var.get().strip()
         port = self._selected_port_device()
-
-        if not project or not (Path(project) / "platformio.ini").is_file():
-            messagebox.showwarning(APP_TITLE, "Vælg en mappe med platformio.ini.")
-            return
-        if not env or env == "—":
-            messagebox.showwarning(APP_TITLE, "Vælg et environment.")
-            return
         if not port:
             messagebox.showwarning(APP_TITLE, "Vælg en COM-port.")
             return
-        if not self._pio:
-            self._pio = find_pio()
-        if not self._pio:
-            messagebox.showerror(APP_TITLE, "PlatformIO CLI ikke fundet.")
+        if not UPDATE_DEVICE_PS1.is_file():
+            messagebox.showerror(APP_TITLE, f"Mangler script:\n{UPDATE_DEVICE_PS1}")
+            return
+        if not messagebox.askyesno(
+            APP_TITLE,
+            "Flasher NINA-firmware + SSL-certifikater.\n"
+            "Luk andre Serial Monitors. Fortsæt?",
+        ):
+            return
+
+        self._save_settings()
+        self._set_busy(True)
+        self.set_status("NINA + SSL…")
+
+        def worker() -> None:
+            try:
+                if self._monitor.is_running:
+                    self._log_threadsafe("Stopper monitor før NINA-update…")
+                    self._monitor.stop()
+                    time.sleep(0.5)
+                code = run_powershell(
+                    UPDATE_DEVICE_PS1,
+                    ["-Port", port, "-SkipSketch"],
+                    self._log_threadsafe,
+                )
+                if code != 0:
+                    self._log_threadsafe(f"NINA+SSL fejlede (exit {code})")
+                    self.after(0, lambda: self.set_status(f"Fejl (exit {code})"))
+                else:
+                    self._log_threadsafe("NINA + SSL færdig")
+                    self.after(0, lambda: self.set_status("NINA + SSL OK"))
+                self.after(0, lambda: self.refresh_ports(auto_select=True))
+            finally:
+                self.after(0, lambda: self._set_busy(False))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _on_monitor_stopped(self) -> None:
+        self.after(0, lambda: self.set_status("Klar") if not self._busy else None)
+
+    def _start_pio_job(self, steps: list[str], status: str) -> None:
+        """steps: 'build' | 'clean' — rebuild = clean then build."""
+        if self._busy:
+            return
+        req = self._require_project_env(need_port=False)
+        if not req:
+            return
+        project, env, _port = req
+        self._save_settings()
+        self._set_busy(True)
+        self.set_status(status)
+
+        def worker() -> None:
+            try:
+                code = 0
+                for step in steps:
+                    if step == "clean":
+                        code = run_pio(
+                            project, env, self._log_threadsafe, targets=["clean"], pio_path=self._pio
+                        )
+                    elif step == "build":
+                        code = run_pio(
+                            project, env, self._log_threadsafe, targets=None, pio_path=self._pio
+                        )
+                    if code != 0:
+                        self._log_threadsafe(f"{step} fejlede (exit {code})")
+                        self.after(0, lambda c=code: self.set_status(f"Fejl (exit {c})"))
+                        return
+                self._log_threadsafe("Job OK")
+                self.after(0, lambda: self.set_status("Klar"))
+            finally:
+                self.after(0, lambda: self._set_busy(False))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _start_upload_job(self, monitor: bool) -> None:
+        if self._busy:
+            return
+        req = self._require_project_env(need_port=True)
+        if not req:
+            return
+        project, env, port = req
+        assert port is not None
+
+        if not self._ensure_secrets_before_upload(project):
             return
 
         self._save_settings()
@@ -319,29 +540,26 @@ class ArduinoStarterApp(ctk.CTk):
 
         def worker() -> None:
             try:
-                # Frigør port før upload
                 if self._monitor.is_running:
                     self._log_threadsafe("Stopper monitor før upload…")
                     self._monitor.stop()
-                    import time
                     time.sleep(0.5)
 
-                if upload:
-                    self.after(0, lambda: self.set_status("Uploader…"))
-                    code = run_upload(
-                        project_dir=project,
-                        env_name=env,
-                        port=port,
-                        on_line=self._log_threadsafe,
-                        pio_path=self._pio,
-                    )
-                    if code != 0:
-                        self._log_threadsafe(f"Upload fejlede (exit {code})")
-                        self.after(0, lambda: self.set_status(f"Fejl (exit {code})"))
-                        return
+                self.after(0, lambda: self.set_status("Uploader…"))
+                code = run_upload(
+                    project_dir=project,
+                    env_name=env,
+                    port=port,
+                    on_line=self._log_threadsafe,
+                    pio_path=self._pio,
+                )
+                if code != 0:
+                    self._log_threadsafe(f"Upload fejlede (exit {code})")
+                    self.after(0, lambda: self.set_status(f"Fejl (exit {code})"))
+                    return
 
-                    self._log_threadsafe("Upload OK")
-                    self.after(0, self.refresh_ports)
+                self._log_threadsafe("Upload OK")
+                self.after(0, lambda: self.refresh_ports(auto_select=True))
 
                 if monitor:
                     self.after(0, lambda: self.set_status("Venter på board…"))
@@ -354,7 +572,6 @@ class ArduinoStarterApp(ctk.CTk):
 
                     def start_mon() -> None:
                         self.refresh_ports()
-                        # Opdater dropdown til app_port
                         for lab, dev in self._port_map.items():
                             if dev.upper() == app_port.upper():
                                 self.port_var.set(lab)

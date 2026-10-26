@@ -25,6 +25,23 @@ class SerialPortInfo:
         return f"{self.device} — {self.description}{tag}"
 
 
+def _port_score(info: SerialPortInfo) -> int:
+    """Højere = bedre. Bluetooth lavt; Arduino/MKR højt; bootloader midt."""
+    blob = f"{info.description} {info.hwid}".lower()
+    score = 0
+    if "bluetooth" in blob:
+        score -= 100
+    if any(x in blob for x in ("arduino", "mkr", "2341")):
+        score += 50
+    if "usb serial" in blob or "usb serial device" in blob:
+        score += 20
+    if info.is_bootloader:
+        score -= 15  # OK hvis intet andet, men foretræk app-port
+    if info.device.upper().startswith("COM"):
+        score += 1
+    return score
+
+
 def list_ports() -> list[SerialPortInfo]:
     result: list[SerialPortInfo] = []
     for p in serial.tools.list_ports.comports():
@@ -41,20 +58,29 @@ def list_ports() -> list[SerialPortInfo]:
         )
 
     def sort_key(info: SerialPortInfo):
-        # Arduino/MKR først, derefter COM-nummer
-        prio = 0 if any(
-            x in (info.description + info.hwid)
-            for x in ("Arduino", "MKR", "2341", "USB Serial")
-        ) else 1
         num = 999
         if info.device.upper().startswith("COM"):
             try:
                 num = int(info.device[3:])
             except ValueError:
                 pass
-        return (prio, num, info.device)
+        return (-_port_score(info), num, info.device)
 
     return sorted(result, key=sort_key)
+
+
+def pick_best_port(ports: list[SerialPortInfo] | None = None) -> SerialPortInfo | None:
+    """Vælg bedste Arduino/MKR-port. Returnér None hvis kun Bluetooth/ukendte porte."""
+    ports = ports if ports is not None else list_ports()
+    if not ports:
+        return None
+    # Kræv positiv score (Arduino/MKR/USB Serial) — aldrig auto-vælg Bluetooth
+    candidates = [p for p in ports if _port_score(p) > 0]
+    if not candidates:
+        return None
+    apps = [p for p in candidates if not p.is_bootloader]
+    pool = apps if apps else candidates
+    return max(pool, key=_port_score)
 
 
 def wait_for_app_port(

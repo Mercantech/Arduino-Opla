@@ -1,33 +1,35 @@
 # Arduino Starter — Upload & Monitor
 
-Lille Windows-desktopapp der efterligner PlatformIO’s **Upload and Monitor**.
+Lille Windows-desktopapp der efterligner PlatformIO’s **Upload and Monitor**, plus værksteds-værktøjer.
 
 ## Krav
 
 - Python 3.11+
-- PlatformIO CLI (`pio` / `platformio`) installeret
+- PlatformIO CLI (`pio` / `platformio`)
 - USB-board (fx MKR WiFi 1010)
 
 ## Start
 
-Dobbeltklik **`Start.bat`**, eller i PowerShell:
+Dobbeltklik **`Start.bat`**, eller:
 
 ```powershell
 cd Hardwaretestere/ArduinoStarter
 .\Start.ps1
 ```
 
-`python` virker ofte ikke i Windows-terminal (Store-alias / mangler PATH). Scriptet finder selv Python 3.11+ under `%LOCALAPPDATA%\Programs\Python\`.
+## Funktioner
 
-Manuelt (fuld sti):
+| Knap | Handling |
+|------|----------|
+| **Upload** / **Monitor** / **Upload & Monitor** | Som PlatformIO |
+| **Stop monitor** | Frigør COM-port |
+| **Auto** | Vælg bedste Arduino/MKR-port (ignorer Bluetooth) |
+| **Build** | `pio run` (compile only) |
+| **Clean** / **Rebuild** | `pio run -t clean` (+ build) |
+| **NINA + SSL** | Kører `../Update-Device.ps1 -Port COMx -SkipSketch` |
+| **Secrets…** | Redigér `src/Secrets.h` (WiFi SSID/password) |
+| **Gem log** | Gem log-vindue til `.txt` |
 
-```powershell
-& "$env:LOCALAPPDATA\Programs\Python\Python311\python.exe" -m pip install -r requirements.txt
-& "$env:LOCALAPPDATA\Programs\Python\Python311\python.exe" app.py
-```
+Upload **blokeres**, hvis `Secrets.h` mangler eller SSID er tom/placeholder — appen kan oprette filen fra `Secrets.h.example`.
 
-1. Vælg en mappe med `platformio.ini`
-2. Vælg environment og COM-port
-3. **Upload & Monitor**
-
-Luk monitor (**Stop monitor**) før du uploader igen, hvis porten er optaget.
+Luk monitor (**Stop monitor**) før upload/NINA, hvis porten er optaget.

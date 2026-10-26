@@ -102,16 +102,17 @@ def parse_platformio_ini(project_dir: str | Path) -> list[PioEnv]:
     return envs
 
 
-def run_upload(
+def run_pio(
     project_dir: str | Path,
     env_name: str,
-    port: str,
     on_line: LogFn,
+    targets: list[str] | None = None,
+    upload_port: str | None = None,
     pio_path: str | None = None,
     cancel_event: threading.Event | None = None,
 ) -> int:
     """
-    Kør `pio run -e <env> -t upload --upload-port <port>`.
+    Kør `pio run -e <env> [-t target…] [--upload-port COMx]`.
     Streamer stdout/stderr linje for linje via on_line.
     Returnerer process exit code.
     """
@@ -121,16 +122,12 @@ def run_upload(
         return 127
 
     project_dir = Path(project_dir)
-    cmd = [
-        pio,
-        "run",
-        "-e",
-        env_name,
-        "-t",
-        "upload",
-        "--upload-port",
-        port,
-    ]
+    cmd = [pio, "run", "-e", env_name]
+    for t in targets or []:
+        cmd.extend(["-t", t])
+    if upload_port:
+        cmd.extend(["--upload-port", upload_port])
+
     on_line(f"$ {' '.join(cmd)}")
     on_line(f"cwd: {project_dir}")
 
@@ -155,7 +152,7 @@ def run_upload(
         for line in proc.stdout:
             if cancel_event and cancel_event.is_set():
                 proc.terminate()
-                on_line("Upload afbrudt.")
+                on_line("Job afbrudt.")
                 break
             on_line(line.rstrip("\r\n"))
     finally:
@@ -164,4 +161,78 @@ def run_upload(
         except Exception:
             pass
 
+    return proc.wait()
+
+
+def run_upload(
+    project_dir: str | Path,
+    env_name: str,
+    port: str,
+    on_line: LogFn,
+    pio_path: str | None = None,
+    cancel_event: threading.Event | None = None,
+) -> int:
+    """Kør `pio run -e <env> -t upload --upload-port <port>`."""
+    return run_pio(
+        project_dir=project_dir,
+        env_name=env_name,
+        on_line=on_line,
+        targets=["upload"],
+        upload_port=port,
+        pio_path=pio_path,
+        cancel_event=cancel_event,
+    )
+
+
+def run_powershell(
+    script_path: str | Path,
+    args: list[str],
+    on_line: LogFn,
+    cancel_event: threading.Event | None = None,
+) -> int:
+    """Kør et .ps1-script og stream output."""
+    script_path = Path(script_path)
+    if not script_path.is_file():
+        on_line(f"FEJL: script mangler: {script_path}")
+        return 127
+
+    cmd = [
+        "powershell",
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        str(script_path),
+        *args,
+    ]
+    on_line(f"$ {' '.join(cmd)}")
+
+    creationflags = 0
+    if os.name == "nt":
+        creationflags = subprocess.CREATE_NO_WINDOW  # type: ignore[attr-defined]
+
+    proc = subprocess.Popen(
+        cmd,
+        cwd=str(script_path.parent),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        bufsize=1,
+        creationflags=creationflags,
+    )
+    assert proc.stdout is not None
+    try:
+        for line in proc.stdout:
+            if cancel_event and cancel_event.is_set():
+                proc.terminate()
+                on_line("Script afbrudt.")
+                break
+            on_line(line.rstrip("\r\n"))
+    finally:
+        try:
+            proc.stdout.close()
+        except Exception:
+            pass
     return proc.wait()
