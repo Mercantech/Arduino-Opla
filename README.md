@@ -8,8 +8,8 @@ Desktop-app (Python) der efterligner PlatformIO **Upload and Monitor** — vælg
 
 ```powershell
 cd Hardwaretestere/ArduinoStarter
-python -m pip install -r requirements.txt
-python app.py
+.\Start.ps1
+# eller dobbeltklik Start.bat
 ```
 
 ## HardwareTest (PlatformIO)

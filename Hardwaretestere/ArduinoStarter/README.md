@@ -10,10 +10,20 @@ Lille Windows-desktopapp der efterligner PlatformIO’s **Upload and Monitor**.
 
 ## Start
 
+Dobbeltklik **`Start.bat`**, eller i PowerShell:
+
 ```powershell
 cd Hardwaretestere/ArduinoStarter
-python -m pip install -r requirements.txt
-python app.py
+.\Start.ps1
+```
+
+`python` virker ofte ikke i Windows-terminal (Store-alias / mangler PATH). Scriptet finder selv Python 3.11+ under `%LOCALAPPDATA%\Programs\Python\`.
+
+Manuelt (fuld sti):
+
+```powershell
+& "$env:LOCALAPPDATA\Programs\Python\Python311\python.exe" -m pip install -r requirements.txt
+& "$env:LOCALAPPDATA\Programs\Python\Python311\python.exe" app.py
 ```
 
 1. Vælg en mappe med `platformio.ini`
