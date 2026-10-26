@@ -10,7 +10,10 @@ Desktop-app (Python) der efterligner PlatformIO **Upload and Monitor** — vælg
 cd Hardwaretestere/ArduinoStarter
 .\Start.ps1
 # eller dobbeltklik Start.bat
+# Elev-.exe: .\build_exe.ps1  →  dist\ArduinoStarter\ArduinoStarter.exe
 ```
+
+Appen har favoritter, farvet OK/FEJL-log, dark/light + stor font, Secrets-editor, Build/Clean og NINA+SSL.
 
 ## HardwareTest (PlatformIO)
 

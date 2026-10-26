@@ -11,6 +11,7 @@ from tkinter import filedialog, messagebox
 
 import customtkinter as ctk
 
+from log_style import TAG_COLORS, classify_line
 from pio_runner import find_pio, parse_platformio_ini, run_pio, run_powershell, run_upload
 from secrets_editor import (
     ensure_secrets_file,
@@ -27,8 +28,37 @@ from serial_monitor import (
 
 APP_TITLE = "Arduino Starter — Upload & Monitor"
 SETTINGS_PATH = Path.home() / ".arduino_starter.json"
-DEFAULT_PROJECT = Path(__file__).resolve().parent.parent / "HardwareTest"
-UPDATE_DEVICE_PS1 = Path(__file__).resolve().parent.parent / "Update-Device.ps1"
+STARTER_DIR = Path(__file__).resolve().parent
+HARDWARETESTERE = STARTER_DIR.parent
+REPO_ROOT = HARDWARETESTERE.parent
+DEFAULT_PROJECT = HARDWARETESTERE / "HardwareTest"
+UPDATE_DEVICE_PS1 = HARDWARETESTERE / "Update-Device.ps1"
+
+FONT_SIZES = (13, 16, 20, 24)
+
+
+def _default_favorites() -> list[dict[str, str]]:
+    """Scan repo for PlatformIO-projekter + kendte mapper."""
+    found: list[dict[str, str]] = []
+    seen: set[str] = set()
+
+    def add(name: str, path: Path) -> None:
+        key = str(path.resolve()).lower()
+        if key in seen or not path.is_dir():
+            return
+        if not (path / "platformio.ini").is_file():
+            return
+        seen.add(key)
+        found.append({"name": name, "path": str(path.resolve())})
+
+    add("HardwareTest", DEFAULT_PROJECT)
+    for base in (HARDWARETESTERE, REPO_ROOT):
+        if not base.is_dir():
+            continue
+        for child in sorted(base.iterdir()):
+            if child.is_dir() and not child.name.startswith("."):
+                add(child.name, child)
+    return found
 
 
 class ArduinoStarterApp(ctk.CTk):
@@ -38,7 +68,12 @@ class ArduinoStarterApp(ctk.CTk):
         self.geometry("1000x680")
         self.minsize(780, 520)
 
-        ctk.set_appearance_mode("dark")
+        self._theme = "dark"
+        self._font_size = 16
+        self._favorites: list[dict[str, str]] = _default_favorites()
+        self._load_settings_data()
+
+        ctk.set_appearance_mode(self._theme)
         ctk.set_default_color_theme("blue")
 
         self._pio = find_pio()
@@ -46,13 +81,17 @@ class ArduinoStarterApp(ctk.CTk):
         self._port_map: dict[str, str] = {}
         self._busy = False
         self._action_buttons: list[ctk.CTkButton] = []
+        self._fav_buttons: list[ctk.CTkButton] = []
         self._monitor = SerialMonitor(
             on_line=self._log_threadsafe,
             on_stopped=self._on_monitor_stopped,
         )
 
         self._build_ui()
-        self._load_settings()
+        self._apply_project_from_settings()
+        self._rebuild_favorite_buttons()
+        self._apply_log_tags()
+        self._apply_font()
         self.refresh_ports(auto_select=True)
         self._update_pio_status()
         self.protocol("WM_DELETE_WINDOW", self._on_close)
@@ -72,26 +111,39 @@ class ArduinoStarterApp(ctk.CTk):
             row=0, column=3, padx=6, pady=4
         )
 
-        ctk.CTkLabel(top, text="Environment").grid(row=1, column=0, sticky="w", padx=6, pady=4)
+        # Favoritter
+        ctk.CTkLabel(top, text="Favoritter").grid(row=1, column=0, sticky="nw", padx=6, pady=4)
+        self.fav_frame = ctk.CTkFrame(top, fg_color="transparent")
+        self.fav_frame.grid(row=1, column=1, columnspan=2, sticky="ew", padx=6, pady=4)
+        fav_actions = ctk.CTkFrame(top, fg_color="transparent")
+        fav_actions.grid(row=1, column=3, sticky="e", padx=6, pady=4)
+        ctk.CTkButton(fav_actions, text="+ Favorit", width=90, command=self.add_favorite).pack(
+            side="top", pady=2
+        )
+        ctk.CTkButton(fav_actions, text="− Favorit", width=90, command=self.remove_favorite).pack(
+            side="top", pady=2
+        )
+
+        ctk.CTkLabel(top, text="Environment").grid(row=2, column=0, sticky="w", padx=6, pady=4)
         self.env_var = tk.StringVar()
         self.env_menu = ctk.CTkOptionMenu(
             top, variable=self.env_var, values=["—"], command=self._on_env_change, width=220
         )
-        self.env_menu.grid(row=1, column=1, sticky="w", padx=6, pady=4)
+        self.env_menu.grid(row=2, column=1, sticky="w", padx=6, pady=4)
 
-        ctk.CTkLabel(top, text="Baud").grid(row=1, column=2, sticky="e", padx=6, pady=4)
+        ctk.CTkLabel(top, text="Baud").grid(row=2, column=2, sticky="e", padx=6, pady=4)
         self.baud_var = tk.StringVar(value="9600")
         ctk.CTkEntry(top, textvariable=self.baud_var, width=100).grid(
-            row=1, column=3, sticky="w", padx=6, pady=4
+            row=2, column=3, sticky="w", padx=6, pady=4
         )
 
-        ctk.CTkLabel(top, text="COM-port").grid(row=2, column=0, sticky="w", padx=6, pady=4)
+        ctk.CTkLabel(top, text="COM-port").grid(row=3, column=0, sticky="w", padx=6, pady=4)
         self.port_var = tk.StringVar()
         self.port_menu = ctk.CTkOptionMenu(top, variable=self.port_var, values=["—"], width=360)
-        self.port_menu.grid(row=2, column=1, sticky="ew", padx=6, pady=4)
+        self.port_menu.grid(row=3, column=1, sticky="ew", padx=6, pady=4)
 
         port_btns = ctk.CTkFrame(top, fg_color="transparent")
-        port_btns.grid(row=2, column=2, columnspan=2, sticky="e", padx=6, pady=4)
+        port_btns.grid(row=3, column=2, columnspan=2, sticky="e", padx=6, pady=4)
         ctk.CTkButton(port_btns, text="Auto", width=70, command=self.auto_select_port).pack(
             side="left", padx=3
         )
@@ -154,6 +206,28 @@ class ArduinoStarterApp(ctk.CTk):
         ):
             b.pack(side="left", padx=4, pady=6)
 
+        # Visning (projektor)
+        view = ctk.CTkFrame(self)
+        view.pack(fill="x", **pad)
+        ctk.CTkLabel(view, text="Visning").pack(side="left", padx=8)
+        self.theme_var = tk.StringVar(value=self._theme)
+        ctk.CTkSegmentedButton(
+            view,
+            values=["dark", "light"],
+            variable=self.theme_var,
+            command=self._on_theme_change,
+            width=160,
+        ).pack(side="left", padx=6, pady=6)
+        ctk.CTkLabel(view, text="Font").pack(side="left", padx=(16, 4))
+        self.font_var = tk.StringVar(value=str(self._font_size))
+        ctk.CTkOptionMenu(
+            view,
+            values=[str(s) for s in FONT_SIZES],
+            variable=self.font_var,
+            command=self._on_font_change,
+            width=80,
+        ).pack(side="left", padx=4, pady=6)
+
         self._action_buttons = [
             self.btn_upload,
             self.btn_monitor,
@@ -164,7 +238,9 @@ class ArduinoStarterApp(ctk.CTk):
             self.btn_nina,
         ]
 
-        self.log = ctk.CTkTextbox(self, font=ctk.CTkFont(family="Consolas", size=13))
+        self.log = ctk.CTkTextbox(
+            self, font=ctk.CTkFont(family="Consolas", size=self._font_size)
+        )
         self.log.pack(fill="both", expand=True, padx=10, pady=(0, 6))
 
         self.status_var = tk.StringVar(value="Klar")
@@ -177,28 +253,145 @@ class ArduinoStarterApp(ctk.CTk):
 
     # --- settings ---
 
-    def _load_settings(self) -> None:
-        project = DEFAULT_PROJECT if DEFAULT_PROJECT.is_dir() else None
-        if SETTINGS_PATH.is_file():
-            try:
-                data = json.loads(SETTINGS_PATH.read_text(encoding="utf-8"))
-                p = data.get("project")
-                if p and Path(p).is_dir():
-                    project = Path(p)
-            except (json.JSONDecodeError, OSError):
-                pass
-        if project:
-            self.project_var.set(str(project))
+    def _load_settings_data(self) -> None:
+        """Læs settings før UI (theme/font/favorites/project)."""
+        self._settings_project: str | None = (
+            str(DEFAULT_PROJECT) if DEFAULT_PROJECT.is_dir() else None
+        )
+        if not SETTINGS_PATH.is_file():
+            return
+        try:
+            data = json.loads(SETTINGS_PATH.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            return
+        theme = data.get("theme")
+        if theme in ("dark", "light"):
+            self._theme = theme
+        try:
+            fs = int(data.get("font_size", self._font_size))
+            if fs in FONT_SIZES:
+                self._font_size = fs
+        except (TypeError, ValueError):
+            pass
+        favs = data.get("favorites")
+        if isinstance(favs, list) and favs:
+            cleaned = []
+            for f in favs:
+                if isinstance(f, dict) and f.get("name") and f.get("path"):
+                    if Path(f["path"]).is_dir():
+                        cleaned.append({"name": str(f["name"]), "path": str(f["path"])})
+            if cleaned:
+                self._favorites = cleaned
+        p = data.get("project")
+        if p and Path(p).is_dir():
+            self._settings_project = p
+
+    def _apply_project_from_settings(self) -> None:
+        if self._settings_project:
+            self.project_var.set(self._settings_project)
             self._reload_envs()
 
     def _save_settings(self) -> None:
         try:
             SETTINGS_PATH.write_text(
-                json.dumps({"project": self.project_var.get()}, indent=2),
+                json.dumps(
+                    {
+                        "project": self.project_var.get(),
+                        "theme": self._theme,
+                        "font_size": self._font_size,
+                        "favorites": self._favorites,
+                    },
+                    indent=2,
+                ),
                 encoding="utf-8",
             )
         except OSError:
             pass
+
+    def _on_theme_change(self, value: str) -> None:
+        self._theme = value if value in ("dark", "light") else "dark"
+        ctk.set_appearance_mode(self._theme)
+        self._apply_log_tags()
+        self._save_settings()
+
+    def _on_font_change(self, value: str) -> None:
+        try:
+            size = int(value)
+        except ValueError:
+            return
+        if size not in FONT_SIZES:
+            return
+        self._font_size = size
+        self._apply_font()
+        self._save_settings()
+
+    def _apply_font(self) -> None:
+        self.log.configure(font=ctk.CTkFont(family="Consolas", size=self._font_size))
+
+    def _apply_log_tags(self) -> None:
+        idx = 0 if self._theme == "dark" else 1
+        for tag, colors in TAG_COLORS.items():
+            try:
+                self.log.tag_config(tag, foreground=colors[idx])
+            except Exception:
+                pass
+
+    def _rebuild_favorite_buttons(self) -> None:
+        for b in self._fav_buttons:
+            b.destroy()
+        self._fav_buttons.clear()
+        for fav in self._favorites:
+            name = fav["name"]
+            path = fav["path"]
+            btn = ctk.CTkButton(
+                self.fav_frame,
+                text=name,
+                width=max(90, min(140, 12 * len(name))),
+                command=lambda p=path: self.open_favorite(p),
+            )
+            btn.pack(side="left", padx=3, pady=2)
+            self._fav_buttons.append(btn)
+
+    def open_favorite(self, path: str) -> None:
+        if not Path(path).is_dir():
+            messagebox.showwarning(APP_TITLE, f"Mappen findes ikke:\n{path}")
+            return
+        self.project_var.set(path)
+        self._reload_envs()
+        self._save_settings()
+        self._log(f"Favorit: {path}")
+
+    def add_favorite(self) -> None:
+        project = self.project_var.get().strip()
+        if not project or not (Path(project) / "platformio.ini").is_file():
+            messagebox.showwarning(APP_TITLE, "Vælg et PlatformIO-projekt først.")
+            return
+        path = str(Path(project).resolve())
+        for f in self._favorites:
+            if Path(f["path"]).resolve() == Path(path):
+                messagebox.showinfo(APP_TITLE, "Allerede i favoritter.")
+                return
+        name = Path(path).name
+        self._favorites.append({"name": name, "path": path})
+        self._rebuild_favorite_buttons()
+        self._save_settings()
+        self._log(f"Tilføjet favorit: {name}")
+
+    def remove_favorite(self) -> None:
+        project = self.project_var.get().strip()
+        if not project:
+            return
+        key = str(Path(project).resolve()).lower()
+        before = len(self._favorites)
+        self._favorites = [
+            f for f in self._favorites if str(Path(f["path"]).resolve()).lower() != key
+        ]
+        if len(self._favorites) == before:
+            messagebox.showinfo(APP_TITLE, "Aktuelt projekt er ikke i favoritter.")
+            return
+        self._rebuild_favorite_buttons()
+        self._save_settings()
+        self._log("Favorit fjernet")
 
     # --- helpers ---
 
@@ -213,11 +406,15 @@ class ArduinoStarterApp(ctk.CTk):
         self.status_var.set(text)
 
     def _log(self, line: str) -> None:
-        self.log.insert("end", line + "\n")
+        tag = classify_line(line)
+        if tag:
+            self.log.insert("end", line + "\n", tags=tag)
+        else:
+            self.log.insert("end", line + "\n")
         self.log.see("end")
 
     def _log_threadsafe(self, line: str) -> None:
-        self.after(0, lambda: self._log(line))
+        self.after(0, lambda l=line: self._log(l))
 
     def clear_log(self) -> None:
         self.log.delete("1.0", "end")
